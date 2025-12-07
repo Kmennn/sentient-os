@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:hello_ai_os/services/sync_service.dart';
 import 'package:hello_ai_os/ui/widgets/glass_container.dart';
 import 'package:hello_ai_os/ui/pages/diagnostics_panel.dart';
+import 'package:hello_ai_os/ui/pages/model_manager_page.dart';
+import 'package:hello_ai_os/ui/pages/task_planner_page.dart';
 
 void main() {
   runApp(const SentientOSApp());
@@ -16,7 +19,7 @@ class SentientOSApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sentient OS v1.2',
+      title: 'Sentient OS v1.3',
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF000000),
@@ -45,7 +48,7 @@ class _SentientShellState extends State<SentientShell> {
   final List<_Msg> _messages = [
     const _Msg(
       sender: "AI CORE",
-      text: "Sentient OS v1.2 Online.",
+      text: "Sentient OS v1.3 Online.",
       isSystem: true,
     ),
   ];
@@ -56,6 +59,9 @@ class _SentientShellState extends State<SentientShell> {
   bool _isProcessing = false;
   bool _isBrainConnected = false;
   bool _isBodyConnected = false;
+  bool _isListening = false;
+  bool _isAutoMode = false;
+  Timer? _autoModeTimer;
 
   // Telemetry
   double _cpu = 0.0;
@@ -80,15 +86,54 @@ class _SentientShellState extends State<SentientShell> {
     });
     syncService.messages.listen((msg) {
       if (!mounted) return;
+
+      // Chat Reply
       if (msg['type'] == 'chat.reply' || msg['type'] == 'conversation.result') {
         final content = msg['payload']?['text'] ?? msg['content'] ?? "...";
         _addMessage("JARVIS", content, false);
         setState(() => _isProcessing = false);
       }
+
+      // Action Confirmation (v1.5)
+      if (msg['type'] == 'action.confirmation') {
+        _showConfirmationDialog(msg['payload']);
+      }
+
+      // Notifications
+      if (msg['type'] == 'notification') {
+        _addMessage("SYSTEM", msg['content'], true);
+      }
+
+      // Hotfix H1 Handler
+      if (msg['type'] == 'safety.violation') {
+        _addMessage(
+          "SAFETY",
+          "⚠️ ${msg['content'] ?? 'Safety Violation'}",
+          true,
+        );
+      }
+      if (msg['type'] == 'action.cancelled') {
+        _addMessage("SYSTEM", "🚫 Action cancelled by system.", true);
+        // If dialog is open, it should ideally close, but for now log it.
+        if (Navigator.canPop(context)) {
+          // This is risky if we pop the wrong thing, sticking to message for now.
+        }
+      }
+    });
+
+    // Listen for Wake Events
+    syncService.wakeEvents.listen((_) {
+      if (mounted) {
+        setState(() => _isListening = true);
+        // Auto-hide listening state after 5 seconds of silence (simulation)
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) setState(() => _isListening = false);
+        });
+      }
     });
 
     // 2. Body Polling (Stream simulation via polling /stream)
-    _telemetryTimer = Timer.periodic(const Duration(milliseconds: 1500), (
+    final telemetryTimer = Timer.periodic(const Duration(milliseconds: 1500), (
       timer,
     ) {
       _fetchBodyTelemetry();
@@ -132,6 +177,140 @@ class _SentientShellState extends State<SentientShell> {
     } catch (e) {
       if (mounted) setState(() => _isBodyConnected = false);
     }
+  }
+
+  void _toggleAutoMode() {
+    setState(() => _isAutoMode = !_isAutoMode);
+    if (_isAutoMode) {
+      _addMessage("SYSTEM", "Auto-Pilot Engaged. Scanning every 10s.", true);
+      _performVisionScan(silent: true);
+      _autoModeTimer = Timer.periodic(
+        const Duration(seconds: 10),
+        (t) => _performVisionScan(silent: true),
+      );
+    } else {
+      _addMessage("SYSTEM", "Auto-Pilot Disengaged.", true);
+      _autoModeTimer?.cancel();
+    }
+  }
+
+  Future<void> _performVisionScan({bool silent = false}) async {
+    if (!silent) _addMessage("SYSTEM", "Scanning Visual Field...", true);
+
+    try {
+      // 1. Capture from Body
+      final captureRes = await http.get(
+        Uri.parse('http://127.0.0.1:8001/screenshot'),
+      );
+      if (captureRes.statusCode != 200) throw "Screenshot failed";
+
+      final imageB64 = jsonDecode(captureRes.body)['image'];
+
+      // 2. Analyze in Brain
+      if (!silent) _addMessage("SYSTEM", "Analyzing...", true);
+
+      final analyzeRes = await http.post(
+        Uri.parse('http://127.0.0.1:8000/v1/vision/screenshot'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "image": imageB64,
+          "metadata": {"source": "primary_monitor"},
+        }),
+      );
+
+      final analysis = jsonDecode(analyzeRes.body);
+
+      // 3. Report
+      final desc = analysis['description'];
+      final tags = (analysis['objects'] as List).join(", ");
+
+      _addMessage("VISION", "$desc\n[TAGS]: $tags", false);
+    } catch (e) {
+      if (!silent) _addMessage("SYSTEM", "Vision Error: $e", true);
+    }
+  }
+
+  void _startVoiceSession() {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Voice input is not available in Web version."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      setState(() => _isListening = false);
+    } else {
+      // Desktop: In future, initialize real mic here.
+      // For now, we simulate listening.
+      _addMessage("SYSTEM", "Microphone active (simulated).", true);
+    }
+  }
+
+  Future<void> _showConfirmationDialog(Map<String, dynamic> payload) async {
+    final intent = payload['intent'] ?? "Unknown Action";
+    final summary = payload['summary'] ?? "Allow this action?";
+    final actionId = payload['action_id'];
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // User must choose
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text(
+            "⚠️ Authorization Required",
+            style: TextStyle(color: Colors.amberAccent),
+          ),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text(summary, style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 8),
+                Text(
+                  "Intent: $intent",
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text(
+                'DENY',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _addMessage("SYSTEM", "Action '$intent' Denied.", true);
+                // Ideally send rejection back to Brain
+              },
+            ),
+            TextButton(
+              child: const Text(
+                'ALLOW & EXECUTE',
+                style: TextStyle(
+                  color: Colors.greenAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _addMessage("SYSTEM", "Authorizing...", true);
+
+                // Send Confirmation
+                syncService.sendMessageJson({
+                  "type": "action.confirm",
+                  "payload": {
+                    "action_id": actionId,
+                    "authorized_by": "user_ui",
+                  },
+                });
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _addMessage(String sender, String text, bool isSystem) {
@@ -196,18 +375,42 @@ class _SentientShellState extends State<SentientShell> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          "SENTIENT v1.2",
+                          "SENTIENT v1.6 (OFFLINE)",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             letterSpacing: 2,
+                            color: Colors.lightGreenAccent,
                           ),
                         ),
                         Row(
                           children: [
+                            const Padding(
+                              padding: EdgeInsets.only(right: 8.0),
+                              child: Text(
+                                "LOCAL MODEL",
+                                style: TextStyle(
+                                  color: Colors.cyanAccent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                            if (_isListening)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 8.0),
+                                child: Text(
+                                  "LISTENING...",
+                                  style: TextStyle(
+                                    color: Colors.redAccent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
                             _StatusDot(
                               color: _isBrainConnected
                                   ? Colors.greenAccent
-                                  : Colors.grey,
+                                  : Colors.redAccent,
                               label: "Brain",
                             ),
                             const SizedBox(width: 8),
@@ -219,15 +422,77 @@ class _SentientShellState extends State<SentientShell> {
                             ),
                             const SizedBox(width: 12),
                             IconButton(
+                              icon: Icon(
+                                _isListening ? Icons.mic : Icons.mic_none,
+                                color: _isListening
+                                    ? Colors.redAccent
+                                    : Colors.white,
+                              ),
+                              onPressed: () {
+                                setState(() => _isListening = !_isListening);
+                                if (_isListening) _startVoiceSession();
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _isAutoMode
+                                    ? Icons.autorenew
+                                    : Icons.remove_red_eye_outlined,
+                                color: _isAutoMode
+                                    ? Colors.greenAccent
+                                    : Colors.white,
+                              ),
+                              onPressed: () {
+                                if (_isAutoMode) {
+                                  _toggleAutoMode();
+                                } else {
+                                  _performVisionScan();
+                                }
+                              },
+                              tooltip: "Vision Scan (Hold for Auto)",
+                            ),
+
+                            IconButton(
                               icon: const Icon(
-                                Icons.analytics_outlined,
+                                Icons.settings_system_daydream,
                                 size: 20,
+                                color: Colors.white70,
                               ),
                               onPressed: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => DiagnosticsPanel(
-                                    bodyStats: _rawBodyStats,
+                                  builder: (_) => const ModelManagerPage(),
+                                ),
+                              ),
+                              tooltip: "Model Manager",
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.task_alt,
+                                size: 20,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const TaskPlannerPage(),
+                                ),
+                              ),
+                              tooltip: "Task Planner",
+                            ),
+                            GestureDetector(
+                              onLongPress: _toggleAutoMode,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.analytics_outlined,
+                                  size: 20,
+                                ),
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DiagnosticsPanel(
+                                      bodyStats: _rawBodyStats,
+                                    ),
                                   ),
                                 ),
                               ),

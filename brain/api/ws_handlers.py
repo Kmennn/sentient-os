@@ -25,6 +25,9 @@ class ConnectionManager:
         for connection in self.active_connections:
             await connection.send_text(message)
 
+    async def broadcast_json(self, data: dict):
+        await self.broadcast(json.dumps(data))
+
 manager = ConnectionManager()
 
 @router.websocket("/ws")
@@ -34,6 +37,9 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         while True:
+            # Keep-alive Ping (Server -> Client) could be implemented here with asyncio.create_task 
+            # or rely on client-side pings which we handle below.
+
             data = await websocket.receive_text()
             
             # Parse message
@@ -47,7 +53,31 @@ async def websocket_endpoint(websocket: WebSocket):
                 content = data
                 user_id = session_id
 
-            # === New v1.2 Protocol Handlers ===
+            # === v1.3 Protocol ===
+            if msg_type == "wake.trigger":
+                # Log event
+                # In real system: verify audio confidence
+                await manager.send_personal_message(json.dumps({"type": "wake.ack"}), websocket)
+                continue
+
+            if msg_type == "client.pong":
+                # Client acknowledging server ping
+                continue
+
+            if msg_type == "action.confirm":
+                # User confirmed an action via UI
+                # In v1.5, we just log this. In v1.6, this triggers the Body execution.
+                action_id = msg_obj.get("payload", {}).get("action_id")
+                event_log.log_event("action.confirmed", {"id": action_id})
+                
+                # Notify User of success
+                await manager.send_personal_message(json.dumps({
+                    "type": "notification", 
+                    "content": "Action Confirmed & Executed (Simulated)"
+                }), websocket)
+                continue
+
+            # === v1.2 Protocol ===
             if msg_type == "status.ping":
                 await manager.send_personal_message(json.dumps({"type": "status.pong"}), websocket)
                 continue
@@ -64,6 +94,15 @@ async def websocket_endpoint(websocket: WebSocket):
             # Legacy ping
             if msg_type == "ping":
                 await manager.send_personal_message(json.dumps({"type": "pong"}), websocket)
+                continue
+
+            # Safety Check
+            from core.safety import safety_layer
+            if content and not safety_layer.validate_message(content):
+                await manager.send_personal_message(json.dumps({
+                    "type": "error", 
+                    "content": "Message blocked by safety layer."
+                }), websocket)
                 continue
 
             # Process chat

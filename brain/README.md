@@ -1,49 +1,32 @@
-# Sentient OS - Brain (v1.0)
+# Sentient OS - Brain (v1.6 Offline)
 
-The cognitive core of the Sentient OS. Built with FastAPI and modularized for scalability.
+The cognitive core of the Sentient OS. Updated for **Full Offline Mode** using local inference (Ollama, SentenceTransformer, Tesseract).
 
 ## Architecture
 
-- **core/**: Business logic, configuration, and service adapters (LLM, Memory).
+- **core/**: Business logic, configuration, and `LocalModelEngine`.
 - **api/**: FastAPI routes and WebSocket handlers.
 - **tests/**: Automated health and integration tests.
 
-## Running the Service
+## Prerequisites
 
-### Local Development
+Before running, ensure you have the following installed:
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+1.  **Ollama** (Local LLM)
+    - Download from [ollama.com](https://ollama.com).
 
-# Run server
-python main.py
-```
-
-Server listens on `http://0.0.0.0:8000`.
-
-### Docker
-
-```bash
-docker-compose up --build
 ```
 
 ## API Endpoints
 
-| Method | Path       | Description                                                                    |
-| :----- | :--------- | :----------------------------------------------------------------------------- |
-| `GET`  | `/health`  | System health check.                                                           |
-| `POST` | `/v1/chat` | REST chat (legacy compatible). Payload: `{"user_id": "...", "message": "..."}` |
-| `WS`   | `/ws`      | Real-time chat. Supports `chat` and `conversation.turn` messages.              |
+| Method | Path                  | Description                                |
+| :----- | :-------------------- | :----------------------------------------- |
+| `GET`  | `/local-intelligence` | Returns local model status & memory usage. |
+| `GET`  | `/health`             | System health check.                       |
+| `POST` | `/v1/chat`            | REST chat.                                 |
+| `WS`   | `/ws`                 | Real-time chat.                            |
 
-## Mock Mode
+## Rollback
 
-To run without consuming Gemini API credits (for testing), set:
-
-```env
-MOCK_LLM=true
+To revert to cloud-dependency mode, checkout the `main` branch tag `v1.5`.
 ```
-
-## Rollback Plan
-
-In case of critical failure, revert to the legacy monolithic `brain_server.py` (backup pending) or checkout the `main` branch state prior to the `feat/brain-refactor` merge.
