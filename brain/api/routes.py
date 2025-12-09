@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Body
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import httpx
@@ -9,6 +9,7 @@ from core.config import config
 # from core.llm_service import llm_service (Circular import risk if not careful)
 
 router = APIRouter()
+print("DEBUG: Routes Module Loaded")
 logger = logging.getLogger(__name__)
 
 # Global System Mode
@@ -25,7 +26,7 @@ class ActionRequest(BaseModel):
 class ModeRequest(BaseModel):
     mode: str # OFF, SIMULATED, REAL
 
-@router.post("/v1/system/mode")
+@router.post("/system/mode")
 async def set_mode(req: ModeRequest):
     allowed = ["OFF", "SIMULATED", "REAL"]
     if req.mode.upper() not in allowed:
@@ -34,11 +35,11 @@ async def set_mode(req: ModeRequest):
     logger.info(f"System Autonomy Mode set to: {system_state.AUTONOMY_MODE}")
     return {"status": "success", "mode": system_state.AUTONOMY_MODE}
 
-@router.get("/v1/system/mode")
+@router.get("/system/mode")
 async def get_mode():
     return {"mode": system_state.AUTONOMY_MODE}
 
-@router.post("/v1/action/request")
+@router.post("/action/request")
 async def request_action(req: ActionRequest):
     """
     Bridge: Receives action request from Agent -> Forwards to Body (if allowed).
@@ -77,7 +78,7 @@ async def request_action(req: ActionRequest):
         logger.error(f"Bridge connection error: {e}")
         return {"status": "error", "detail": f"Failed to contact Body: {e}"}
 
-@router.post("/v1/agent/run")
+@router.post("/agent/run")
 async def run_agent_task(query: str):
     """
     Directly trigger the TaskAgent.
@@ -92,3 +93,80 @@ async def run_agent_task(query: str):
     
     response = await llm_service.generate_response(query)
     return {"response": response}
+
+@router.post("/vision/analyze")
+async def analyze_vision(payload: Dict[str, Any] = Body(...)):
+    """
+    Trigger full vision pipeline analysis.
+    Payload: { "capture": true, ... }
+    """
+    capture = payload.get("capture", False)
+    # Handle direct image upload if needed, for now just flag
+    
+    from core.vision.vision_engine import vision_engine
+    result = await vision_engine.analyze(capture=capture)
+    return result
+
+@router.get("/tools")
+async def list_tools():
+    """List available tools."""
+    from core.tools.registry import registry
+    return {"tools": registry.list_tools()}
+
+@router.post("/tools/run")
+async def run_tool(payload: Dict[str, Any] = Body(...)):
+    """
+    Execute a tool by name. 
+    Payload: { "tool": "name", "params": {}, "user_id": "..." }
+    """
+    tool_name = payload.get("tool")
+    params = payload.get("params", {})
+    user_id = payload.get("user_id", "user")
+    
+    from core.tools.registry import registry
+    import uuid
+    import time
+    import json
+    from core.db import get_connection
+
+    tool = registry.get_tool(tool_name)
+    if not tool:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+
+    # Log PENDING
+    inv_id = str(uuid.uuid4())
+    ts = int(time.time())
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO tool_invocations (id, user_id, tool_name, params, result, status, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (inv_id, user_id, tool_name, json.dumps(params), "", "pending", ts))
+    conn.commit()
+    
+    # Execute
+    try:
+        result = tool.run(params)
+        status = "success"
+        result_str = str(result) # Store as stringified for now
+    except Exception as e:
+        result = str(e)
+        status = "error"
+        result_str = str(e)
+
+    # Update Log
+    cursor.execute("""
+        UPDATE tool_invocations 
+        SET result = ?, status = ?
+        WHERE id = ?
+    """, (result_str, status, inv_id))
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": inv_id,
+        "tool": tool_name,
+        "status": status,
+        "result": result
+    }

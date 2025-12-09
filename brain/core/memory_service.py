@@ -80,7 +80,16 @@ class MemoryService:
             "content": content,
             "timestamp": datetime.fromtimestamp(ts_now).isoformat()
         }
+        # Deduplication check
+        if session and session[-1]["content"] == content and session[-1]["role"] == role:
+            # Skip duplicate
+            return
+
         session.append(msg_obj)
+        
+        # Enforce truncation in cache
+        if len(session) > self._cache_limit:
+            session.popleft()
 
     def get_history(self, user_id: str, limit: int = 20) -> List[Dict]:
         """
@@ -156,5 +165,22 @@ class MemoryService:
         # Clear cache
         if user_id in self._cache:
             self._cache[user_id].clear()
+
+    def cleanup_old_memories(self, days=30):
+        """Removes logs older than N days."""
+        import time
+        cutoff = int(time.time()) - (days * 86400)
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM conversations WHERE timestamp < ?", (cutoff,))
+            deleted = cursor.rowcount
+            conn.commit()
+            conn.close()
+            print(f"Cleaned up {deleted} old memory entries.")
+            return deleted
+        except Exception as e:
+            print(f"Cleanup error: {e}")
+            return 0
 
 memory_service = MemoryService()

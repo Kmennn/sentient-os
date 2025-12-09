@@ -54,3 +54,17 @@ The Brain now has dedicated Agents for different tasks:
 
 - "REAL" mode uses `pyautogui` which takes control of your mouse. Use with caution.
 - Task planning is basic (one-shot JSON generation).
+
+### 5. Hotfixes (Applied Post-Release)
+
+- **Dependency Fix**: Added `mss` to `local_kernel` (required for safe visual checks).
+- **Manual Security Toggle**: Added `/admin/toggle-actions` endpoint to forcefully enable REAL mode if configuration is out of sync.
+
+## v1.9 Vision & Tools
+
+This update adds visual perception and deterministic tools.
+
+- **Vision Pipeline**: Screenshot -> OCR -> Analysis.
+- **Tools Framework**: Registry for `date_time`, `file_search`.
+- **New Agents**: `VisionAgent`, `ToolsAgent`.
+- **UI**: New Vision Page and Tools Page.

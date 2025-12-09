@@ -8,6 +8,8 @@ import 'package:hello_ai_os/ui/widgets/glass_container.dart';
 import 'package:hello_ai_os/ui/pages/diagnostics_panel.dart';
 import 'package:hello_ai_os/ui/pages/model_manager_page.dart';
 import 'package:hello_ai_os/ui/pages/task_planner_page.dart';
+import 'package:hello_ai_os/ui/pages/vision_page.dart';
+import 'package:hello_ai_os/ui/pages/tools_page.dart';
 
 void main() {
   runApp(const SentientOSApp());
@@ -479,6 +481,34 @@ class _SentientShellState extends State<SentientShell> {
                                 ),
                               ),
                               tooltip: "Task Planner",
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility_outlined,
+                                size: 20,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const VisionPage(),
+                                ),
+                              ),
+                              tooltip: "Vision Pipeline",
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.build_circle_outlined,
+                                size: 20,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ToolsPage(),
+                                ),
+                              ),
+                              tooltip: "Tools Framework",
                             ),
                             GestureDetector(
                               onLongPress: _toggleAutoMode,

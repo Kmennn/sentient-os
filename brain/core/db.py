@@ -18,6 +18,9 @@ def init_db():
     """Initializes the database tables."""
     conn = get_connection()
     cursor = conn.cursor()
+    # Enable WAL mode for concurrency
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
     
     # Conversations table
     cursor.execute("""
@@ -64,6 +67,32 @@ def init_db():
             timestamp INTEGER
         )
     """)
+    
+    # v1.9 Tables (Vision & Tools)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS vision_events (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            screenshot_path TEXT,
+            ocr_text TEXT,
+            tags TEXT, 
+            timestamp INTEGER
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_vision_ts ON vision_events(timestamp DESC)")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tool_invocations (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            tool_name TEXT,
+            params TEXT,
+            result TEXT,
+            status TEXT,
+            timestamp INTEGER
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tools_name_ts ON tool_invocations(tool_name, timestamp DESC)")
 
     conn.commit()
     conn.close()

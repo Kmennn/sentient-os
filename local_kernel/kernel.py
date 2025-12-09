@@ -53,20 +53,45 @@ import base64
 import io
 
 @app.get("/screenshot")
+@app.get("/vision/screenshot") # v1.9 Standard
 def capture_screen():
-    try:
-        with mss.mss() as sct:
-            # Capture primary monitor
-            monitor = sct.monitors[1]
-            sct_img = sct.grab(monitor)
-            # Convert to PNG
-            png = mss.tools.to_png(sct_img.rgb, sct_img.size)
-            # Encode base64
-            b64_str = base64.b64encode(png).decode('utf-8')
-            return {"image": b64_str}
-    except Exception as e:
-        print(f"Screenshot failed: {e}")
-        return {"error": str(e)}
+    retries = 2
+    for attempt in range(retries):
+        try:
+            with mss.mss() as sct:
+                # Capture primary monitor
+                monitor = sct.monitors[1]
+                sct_img = sct.grab(monitor)
+                # Convert to PNG
+                png = mss.tools.to_png(sct_img.rgb, sct_img.size)
+                
+                # Save to disk (Refinement Spec)
+                import uuid
+                import os
+                
+                # Ensure safe dir in .gemini? No, user said local_kernel/data/screenshots
+                data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "screenshots")
+                os.makedirs(data_dir, exist_ok=True)
+                
+                filename = f"{uuid.uuid4()}.png"
+                filepath = os.path.join(data_dir, filename)
+                
+                with open(filepath, "wb") as f:
+                    f.write(png)
+                    
+                b64_str = base64.b64encode(png).decode('utf-8')
+                
+                # Returning JSON with both for maximum flexibility
+                return {
+                    "image": b64_str, 
+                    "path": filepath,
+                    "filename": filename
+                }
+        except Exception as e:
+            print(f"Screenshot attempt {attempt + 1} failed: {e}")
+            if attempt == retries - 1:
+                return {"error": str(e)}
+            time.sleep(0.5)
 
 # --- SAFE EXECUTOR STATE ---
 ALLOW_REAL_ACTIONS = False # Set to True via ENV or Config for real execution

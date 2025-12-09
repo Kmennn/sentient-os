@@ -15,7 +15,7 @@ class Config:
     
     # Ollama Configuration
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "tinyllama") # mistral is too heavy for some setups, tinyllama is safer default
+    LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "mistral") # Updated to match installed model
     
     # Legacy flag mapped to local mode for backward compatibility if needed, 
     # but strictly we are "local_llm" now.
