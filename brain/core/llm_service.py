@@ -7,16 +7,97 @@ from typing import Optional
 import json
 import asyncio
 
+
+# Templates
+PROMPT_CHAT = """
+System: You are Sentient OS, a helpful and intelligent AI assistant. 
+You strictly follow these rules:
+1. Be concise and friendly.
+2. Use context from memory if relevant.
+3. If unsure, admit it.
+
+Context:
+{context}
+
+History:
+{history}
+
+User: {query}
+Assistant:
+"""
+
+PROMPT_SEARCH = """
+System: You are a Research Assistant. Synthesize the provided Search Results to answer the user's question.
+If the results do not contain the answer, say "I couldn't find that information locally."
+
+Search Results:
+{context}
+
+User: {query}
+Assistant:
+"""
+
+PROMPT_TASK = """
+System: You are an Automation Agent. Analyze the user's request and map it to a sequence of actions.
+Available Actions: OPEN_APP, SCROLL_UP, SCROLL_DOWN, CLICK, TYPE_TEXT, MOUSE_MOVE.
+
+User: {query}
+
+Output JSON ONLY.
+"""
+
 class LLMService:
     def __init__(self):
         self._search_agent = SearchAgent()
         self._task_agent = TaskAgent()
         self._intent_cache = {}
+        self._context_threshold = 0.5 # L2 Distance. Lower is better? 
+        # FAISS IndexFlatL2 returns squared Euclidean distance.
+        # Relevance depends on embedding normalization. 
+        # Typically 0.0 is exact match. > 1.0 is far.
+        # Let's assume < 1.0 is relevant for MiniLM-L6-v2 normalized?? 
+        # Actually usually cosine distance is better, but L2 is okay. 
+        # Let's say threshold is distance < 1.2
+        self._distance_threshold = 1.2 
+
+    def _filter_context(self, results: list, max_age_days: int = 30) -> str:
+        """
+        Filter vector results by relevance score and recency.
+        """
+        import time
+        filtered = []
+        now = int(time.time())
+        cutoff = now - (max_age_days * 86400)
+        
+        for r in results:
+            # Score check (L2 distance, lower is better)
+            score = r.get("score", 100.0)
+            if score > self._distance_threshold:
+                continue
+                
+            # Date check
+            ts = r.get("timestamp", 0)
+            if ts < cutoff:
+                continue
+                
+            filtered.append(r["text"])
+            
+        return "\n".join([f"- {txt[:200]}" for txt in filtered])
+
+    async def _self_check(self, question: str, answer: str) -> bool:
+        """
+        Lightweight check: Does answer match question?
+        """
+        prompt = f"Question: {question}\nAnswer: {answer}\nDoes the answer directly address the question? YES or NO."
+        try:
+            # Very short timeout for check
+            check = await asyncio.wait_for(local_engine.generate(prompt), timeout=10.0)
+            return "YES" in check.upper()
+        except:
+            return True # Fallback to trusting generation on timeout
 
     async def _detect_intent(self, text: str) -> str:
-        """
-        Classify intent: CHAT, SEARCH, or TASK.
-        """
+        # Check Cache
         if text in self._intent_cache:
             return self._intent_cache[text]
 
@@ -60,48 +141,56 @@ class LLMService:
         intent = await self._detect_intent(text)
         print(f"DEBUG: Intent detected: {intent}")
 
-        # 2. Route to Agent
+        # 2. Route to Agent or Handle Chat
         if intent == "SEARCH":
-            # Delegate to SearchAgent
+            # Delegate to SearchAgent (it handles its own vector search usually, 
+            # but we can enhance it here with _filter_context logic if we owned it)
+            # For v1.9, SearchAgent.run() returns raw vector match objects.
             results = await self._search_agent.run(text)
-            # Summarize results
-            context_str = "\n".join([f"- {r['text'][:200]}..." for r in results[0]['results']])
-            prompt = f"User asked: {text}\n\nSearch Results:\n{context_str}\n\nProvide a concise answer."
-            return await local_engine.generate(prompt)
+            
+            # Apply Filter
+            # results[0]['results'] is the list
+            if results and 'results' in results[0]:
+                raw_list = results[0]['results']
+                # But wait, search_agent implementation might return differently? 
+                # Checking search_agent usage in original file:
+                # results[0]['results'] was accessed.
+                # Just passing context string to prompt.
+                
+                # I will construct context using my filter
+                context_str = self._filter_context(raw_list)
+                prompt = PROMPT_SEARCH.format(context=context_str, query=text)
+                
+                response = await local_engine.generate(prompt)
+                
+                # Self Check
+                if not await self._self_check(text, response):
+                    print("Self-check failed. Regenerating...")
+                    response = await local_engine.generate(prompt + "\nRefine the answer to be more direct.")
+                    
+                return response
+            else:
+                 return "I found no results locally."
 
         elif intent == "TASK":
             # Delegate to TaskAgent
             plan = await self._task_agent.run(text)
-            
-            # Format plan for display
             steps_str = json.dumps(plan[0], indent=2) 
             
             # --- BRIDGE INTEGRATION (v1.8) ---
-            # If we have actions, we should trigger a confirmation request to the UI.
-            # We need to import the manager here to avoid circular imports at top level if possible, 
-            # or move manager to a shared module.
             try:
                 from api.ws_handlers import manager
                 import uuid
-                
-                # Check for actions
                 actions = plan 
                 if actions:
-                    # For v1.8 MVP, we confirm the FIRST action. 
-                    # Complex plans would need a loop or bulk confirmation.
                     first_action = actions[0]
                     action_id = str(uuid.uuid4())
-                    
-                    # Store pending action intent if needed?
-                    # Ideally we persist pending actions in DB. 
-                    
                     await manager.broadcast_json({
                         "type": "action.confirmation",
                         "payload": {
                             "action_id": action_id,
                             "intent": first_action.get("action"),
                             "summary": f"Allow {first_action.get('action')} with {first_action.get('params')}?",
-                            # Pass the actual execution params so we can run it on confirm
                             "execution_data": first_action
                         }
                     })
@@ -119,24 +208,32 @@ class LLMService:
             return await tools_agent.run(text)
 
         else:
-            # Standard Chat (CHAT)
-            # Get Context
-            history_context = ""
-            if history: 
-                # formatting... simple string concat for now
-                pass 
-                
-            # Use Memory Service for context if not provided
-            # (llm_service is usually called with history=None in current routes, 
-            # but memory_service has the persistent log)
+            # CHAT
+            # Get Context (Vector Search + Memory)
+            # 1. Memory Service (Short Term)
             recent_msgs = memory_service.get_history("user", limit=5)
             history_str = "\n".join([f"{m['role']}: {m['content']}" for m in recent_msgs])
             
-            full_prompt = f"System: You are Sentient OS.\nHistory:\n{history_str}\nUser: {text}\nAssistant:"
+            # 2. Vector Search (Long Term) - NOT in original CHAT logic, adding it for v1.9
+            from core.vector_store import vector_store
+            long_term_results = vector_store.search(text, k=3)
+            long_term_ctx = self._filter_context(long_term_results)
             
+            full_prompt = PROMPT_CHAT.format(
+                context=long_term_ctx,
+                history=history_str,
+                query=text
+            )
+            
+            # Generate
             if stream:
                 return local_engine.generate_stream(full_prompt)
             else:
-                return await local_engine.generate(full_prompt)
+                response = await local_engine.generate(full_prompt)
+                # Self Check for Chat
+                if not await self._self_check(text, response):
+                     # Retry once
+                     response = await local_engine.generate(full_prompt + "\nSystem: Previous answer was off-topic. Try again.")
+                return response
 
 llm_service = LLMService()

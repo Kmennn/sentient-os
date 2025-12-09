@@ -631,6 +631,36 @@ class _SentientShellState extends State<SentientShell> {
                   ),
                 ),
 
+                // Thinking Indicator
+                if (_isProcessing)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: const [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.cyanAccent,
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          "Thinking...",
+                          style: TextStyle(
+                            color: Colors.cyanAccent,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Input
                 Padding(
                   padding: const EdgeInsets.all(16.0),

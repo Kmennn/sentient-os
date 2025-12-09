@@ -1,51 +1,19 @@
-
 import base64
 import httpx
 import logging
 from core.vision.ocr_engine import ocr_engine
-from core.vision.detect_engine import detect_engine
-from core.db import get_connection
+from core.local_model_engine import local_engine
+from core.vision.image_utils import preprocess_image
+import re
 
-logger = logging.getLogger("vision_engine")
+logger = logging.getLogger(__name__)
 
 class VisionEngine:
     def __init__(self):
-        self.body_url = "http://localhost:8001/vision/screenshot"
+        self.screenshot_url = "http://localhost:8001/vision/screenshot"
 
-    async def capture_screen(self) -> bytes:
-        """Fetch screenshot from Body"""
+    async def capture_screen(self):
         async with httpx.AsyncClient() as client:
-            try:
-                resp = await client.get(self.body_url, timeout=2.0)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    b64_img = data.get("image")
-                    if b64_img:
-                        return base64.b64decode(b64_img)
-            except Exception as e:
-                logger.error(f"Failed to capture screen: {e}")
-        return None
-
-    async def analyze(self, image_bytes: bytes = None, capture: bool = False):
-        """
-        Full analysis pipeline.
-        """
-        screenshot_path = ""
-        
-        # 1. Capture if requested
-        if capture or not image_bytes:
-             # Call Body
-             async with httpx.AsyncClient() as client:
-                try:
-                    resp = await client.get(self.body_url, timeout=2.0)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        b64_img = data.get("image")
-                        screenshot_path = data.get("path", "")
-                        if b64_img:
-                            image_bytes = base64.b64decode(b64_img)
-                except Exception as e:
-                    logger.error(f"Failed to capture screen: {e}")
 
         if not image_bytes:
             return {"error": "Could not acquire image"}
