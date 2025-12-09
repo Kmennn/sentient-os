@@ -1,9 +1,8 @@
 from typing import List
+from core.local_model_engine import local_engine
 
 class EmbeddingsService:
     def generate_embedding(self, text: str) -> List[float]:
-        # Return a mock 768-dimensional vector (zeros)
-        # In v2.0, this will call a real model
-        return [0.0] * 768
+        return local_engine.embed(text)
 
 embeddings_service = EmbeddingsService()
