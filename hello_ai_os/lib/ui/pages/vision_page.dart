@@ -19,6 +19,7 @@ class _VisionPageState extends State<VisionPage> {
   String _ocrText = "";
   List<dynamic> _tags = [];
   String _summary = "";
+  String _activeWindow = "Unknown";
   String _status = "Ready to see.";
 
   Future<void> _analyzeScreen() async {
@@ -57,6 +58,7 @@ class _VisionPageState extends State<VisionPage> {
               result['summary']['summary'] ??
               (result['summary'] is String ? result['summary'] : "No summary.");
           _tags = result['tags'] ?? [];
+          _activeWindow = result['active_window'] ?? "Unknown";
           _status = "Analysis Complete.";
         });
       } else {
@@ -161,6 +163,10 @@ class _VisionPageState extends State<VisionPage> {
                         Text(
                           "Status: $_status",
                           style: const TextStyle(color: Colors.amber),
+                        ),
+                        Text(
+                          "Active Window: $_activeWindow",
+                          style: const TextStyle(color: Colors.cyanAccent),
                         ),
                         const SizedBox(height: 10),
 

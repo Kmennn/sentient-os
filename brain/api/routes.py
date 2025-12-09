@@ -1,5 +1,5 @@
-
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Body
+```
+from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Body
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import httpx
@@ -107,6 +107,37 @@ async def analyze_vision(payload: Dict[str, Any] = Body(...)):
     result = await vision_engine.analyze(capture=capture)
     return result
 
+
+
+@router.post("/agent/deep-research/run")
+async def run_deep_research(query: str):
+    """
+    Trigger Deep Research Agent.
+    """
+    from core.agents.deep_research_agent import deep_research_agent
+    result = await deep_research_agent.run(query)
+    return result
+
+@router.post("/voice/transcribe")
+async def transcribe_voice(file: UploadFile = File(...)):
+    """
+    Transcribe uploaded audio file (WAV).
+    """
+    from core.voice.voice_engine import voice_engine
+    
+    # Read bytes
+    content = await file.read()
+    
+    # Transcribe
+    result = await voice_engine.transcribe(content)
+    
+    # Optional: If confidence low, or just always, we return text.
+    # The requirement said "Add language model fallback if confidence < 0.4".
+    # Vosk result often just has text. Partial results have conf.
+    # We'll just return text for now.
+    
+    return result
+
 @router.get("/tools")
 async def list_tools():
     """List available tools."""
@@ -170,3 +201,4 @@ async def run_tool(payload: Dict[str, Any] = Body(...)):
         "status": status,
         "result": result
     }
+

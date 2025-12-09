@@ -8,6 +8,7 @@ logger = logging.getLogger("tools")
 class BaseTool(ABC):
     name: str = "base_tool"
     description: str = "Abstract base tool"
+    category: str = "misc"
 
     @abstractmethod
     def run(self, params: Dict[str, Any]) -> Any:
@@ -16,7 +17,13 @@ class BaseTool(ABC):
 class ToolRegistry:
     def __init__(self):
         self._tools: Dict[str, BaseTool] = {}
-        self.autodiscover()
+        self._discovered = False
+
+    def _ensure_discovered(self):
+        if not self._discovered:
+            # Mark true first to avoid recursion if autodiscover triggers something
+            self._discovered = True 
+            self.autodiscover()
 
     def register(self, tool: BaseTool):
         if tool.name in self._tools:
@@ -25,10 +32,16 @@ class ToolRegistry:
         logger.info(f"Registered tool: {tool.name}")
 
     def get_tool(self, name: str) -> BaseTool:
+        self._ensure_discovered()
         return self._tools.get(name)
 
     def list_tools(self) -> List[Dict[str, str]]:
-        return [{"name": t.name, "description": t.description} for t in self._tools.values()]
+        self._ensure_discovered()
+        return [{
+            "name": t.name, 
+            "description": t.description,
+            "category": getattr(t, "category", "misc")
+        } for t in self._tools.values()]
 
     def autodiscover(self):
         """

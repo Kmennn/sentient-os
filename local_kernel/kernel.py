@@ -52,6 +52,18 @@ import mss
 import base64
 import io
 
+
+# Helper for Window
+def _get_active_window():
+    try:
+        import pygetwindow as gw
+        win = gw.getActiveWindow()
+        return win.title if win else "Unknown"
+    except ImportError:
+        return "Install pygetwindow"
+    except Exception:
+        return "Unknown"
+
 @app.get("/screenshot")
 @app.get("/vision/screenshot") # v1.9 Standard
 def capture_screen():
@@ -65,11 +77,10 @@ def capture_screen():
                 # Convert to PNG
                 png = mss.tools.to_png(sct_img.rgb, sct_img.size)
                 
-                # Save to disk (Refinement Spec)
+                # Save to disk
                 import uuid
                 import os
                 
-                # Ensure safe dir in .gemini? No, user said local_kernel/data/screenshots
                 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "screenshots")
                 os.makedirs(data_dir, exist_ok=True)
                 
@@ -81,17 +92,21 @@ def capture_screen():
                     
                 b64_str = base64.b64encode(png).decode('utf-8')
                 
-                # Returning JSON with both for maximum flexibility
+                # Active Window
+                active_window = _get_active_window()
+                
                 return {
                     "image": b64_str, 
                     "path": filepath,
-                    "filename": filename
+                    "filename": filename,
+                    "active_window": active_window
                 }
         except Exception as e:
             print(f"Screenshot attempt {attempt + 1} failed: {e}")
             if attempt == retries - 1:
                 return {"error": str(e)}
             time.sleep(0.5)
+
 
 # --- SAFE EXECUTOR STATE ---
 ALLOW_REAL_ACTIONS = False # Set to True via ENV or Config for real execution
@@ -193,7 +208,7 @@ def stream_telemetry():
         "ts": time.time(),
         "uptime": int(time.time() - psutil.boot_time()),
         "temp": 45.0, # Mock temp
-        "active_window": "VS Code" # Placeholder
+        "active_window": _get_active_window()
     }
 
 async def notify_brain_wake(confidence: float):

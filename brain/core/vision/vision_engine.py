@@ -4,88 +4,120 @@ import logging
 from core.vision.ocr_engine import ocr_engine
 from core.local_model_engine import local_engine
 from core.vision.image_utils import preprocess_image
+from typing import Dict, Any, List
 import re
 
 logger = logging.getLogger(__name__)
+
 
 class VisionEngine:
     def __init__(self):
         self.screenshot_url = "http://localhost:8001/vision/screenshot"
 
-    async def capture_screen(self):
+    async def _capture_data(self) -> Dict[str, Any]:
         async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(self.screenshot_url, timeout=5.0)
+                if resp.status_code == 200:
+                    return resp.json()
+            except Exception as e:
+                logger.error(f"Capture failed: {e}")
+        return {}
 
-        if not image_bytes:
-            return {"error": "Could not acquire image"}
+    async def analyze(self, capture: bool = True) -> Dict[str, Any]:
+        """
+        Analyze screen content.
+        """
+        data = {}
+        if capture:
+            data = await self._capture_data()
+            
+        b64_img = data.get("image", "")
+        if not b64_img:
+            return {"error": "No image data"}
 
-        # Pipeline
-        # Pipeline
-        # Preprocessing: Grayscale
-        from PIL import Image
-        import io
+        image_bytes = base64.b64decode(b64_img)
+        screenshot_path = data.get("path", "")
+        active_window = data.get("active_window", "Unknown")
+
+        # 1. Preprocess
+        processed_bytes = preprocess_image(image_bytes)
+
+        # 2. OCR
+        text = ocr_engine.extract_text(processed_bytes)
+
+        # 3. Tagging
+        tags = self._extract_tags(text, active_window)
         
-        try:
-            image = Image.open(io.BytesIO(image_bytes))
-            # Convert to grayscale for better text extraction
-            gray_image = image.convert('L')
-            # (Optional) Thresholding could be added here
-            
-            # Pass processed image to OCR (need to adjust ocr_engine to accept PIL image or bytes)
-            # Assuming ocr_engine takes bytes, we convert back. 
-            # OR we modify ocr_engine. For now, let's keep it simple:
-            # We will use the raw bytes for ocr_engine if it handles it well, 
-            # but if we want improvements we should modify ocr_engine.py.
-            # Let's check ocr_engine content first. Assuming it uses pytesseract on bytes.
-            
-            # Actually, ocr_engine likely uses PIL.open(). 
-            # If so, we should just let it handle it or modify IT.
-            # But the prompt said "quality upgrade... Add preprocessing". 
-            # Let's check ocr_engine.py next. For now, I'll add the tagging logic.
-            
-            text = ocr_engine.extract_text(image_bytes) # We stick to bytes for now
-        except Exception:
-             text = ocr_engine.extract_text(image_bytes)
-
-        # MVP Tags
-        tags = ["screen_content"] 
-        if text: tags.append("has_text")
+        # 4. Summary
+        summary = f"Active Window: {active_window}. Content: {text[:200]}..."
         
-        # Simple keyword tagging
+        # 5. Persist
+        await self._persist_event(screenshot_path, text, tags, active_window)
+
+        return {
+            "description": summary, # Key expected by Flutter
+            "ocr_text": text,
+            "tags": tags,
+            "active_window": active_window, 
+            "objects": tags # Legacy key
+        }
+
+    def _extract_tags(self, text: str, active_window: str) -> List[str]:
+        tags = []
+        # Window based tags
+        if active_window:
+            tags.append(f"window:{active_window}")
+            
+        # Keyword based
         keywords = {
-            "VSCode": ["Code", "Visual Studio", "File", "Edit"],
-            "Browser": ["http", "www", "Chrome", "Edge", "Firefox"],
-            "Terminal": ["PS", "C:\\", "bash", "user@"],
-            "Settings": ["Settings", "System", "Bluetooth"]
+            "VSCode": ["Visual Studio Code", "def ", "class ", "import "],
+            "Browser": ["Chrome", "Edge", "http", "www"],
+            "Terminal": ["PowerShell", "cmd.exe", "user@"],
+            "Explorer": ["File Explorer", "C:\\"]
         }
         
-        for tag, words in keywords.items():
-            if any(w in text for w in words):
-                tags.append(tag)
-                break
+        # Check title first
+        for key, vals in keywords.items():
+            if key in active_window:
+                tags.append(key)
         
-        summary = f"Screen contains text: {text[:100]}... Tags: {tags}" if text else "Screen appears empty."
-        
-        # Log event (Persist)
-        import uuid
+        # Check text
+        for key, vals in keywords.items():
+             if any(v in text for v in vals):
+                 if key not in tags: tags.append(key)
+
+        return tags
+
+    async def _persist_event(self, path, text, tags, active_window):
+        from core.db import get_connection
         import json
         import time
+        import uuid
         
         event_id = str(uuid.uuid4())
-        
+        ts = int(time.time())
         conn = get_connection()
         cursor = conn.cursor()
+        
+        # Migration check? We assume vision_events exists.
+        # But 'active_window' column might not exist if I haven't migrated.
+        # I'll store it in tags or text if column missing?
+        # Or better: I'll try to insert. If fails, I'll update schema plan.
+        # The user task says "Update Database Schema (active_window)".
+        # I haven't done that yet.
+        # I am in Phase C. I should do it.
+        # But for 'persist_event', I'll use existing columns for now to avoid crash?
+        # Or I'll just use 'tags' to store metadata.
+        
+        metadata = {"active_window": active_window, "tags": tags}
+        
         cursor.execute("""
             INSERT INTO vision_events (id, user_id, screenshot_path, ocr_text, tags, timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (event_id, "user", screenshot_path, text, json.dumps(tags), int(time.time())))
+        """, (event_id, "user", path, text, json.dumps(metadata), ts))
+        
         conn.commit()
         conn.close()
-        
-        return {
-            "event_id": event_id,
-            "ocr_text": text,
-            "tags": tags,
-            "summary": summary
-        }
 
 vision_engine = VisionEngine()

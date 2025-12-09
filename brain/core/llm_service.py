@@ -59,6 +59,11 @@ class LLMService:
         # Actually usually cosine distance is better, but L2 is okay. 
         # Let's say threshold is distance < 1.2
         self._distance_threshold = 1.2 
+        
+        # v1.9 Autonomy State
+        self._pending_actions = {} # {action_id: {"action": ..., "plan_id": ...}}
+        self._active_plans = {}    # {plan_id: [actions]}
+        self._plan_progress = {}   # {plan_id: next_index}
 
     def _filter_context(self, results: list, max_age_days: int = 30) -> str:
         """
@@ -137,6 +142,14 @@ class LLMService:
         return final_intent
 
     async def generate_response(self, text: str, history: list = None, stream: bool = False) -> str:
+        # 0. Deep Research Check (v1.9)
+        research_keywords = ["research", "investigate", "analyze deeply", "full report"]
+        if any(k in text.lower() for k in research_keywords):
+             print(f"DEBUG: Routing to Deep Research Agent: {text}")
+             from core.agents.deep_research_agent import deep_research_agent
+             res = await deep_research_agent.run(text)
+             return f"**Deep Research Report**\n\n{res.get('final_answer', str(res))}\n\n*Sources: {len(res.get('citations', []))}*"
+
         # 1. Detect Intent
         intent = await self._detect_intent(text)
         print(f"DEBUG: Intent detected: {intent}")
@@ -175,29 +188,18 @@ class LLMService:
         elif intent == "TASK":
             # Delegate to TaskAgent
             plan = await self._task_agent.run(text)
-            steps_str = json.dumps(plan[0], indent=2) 
+            steps_str = json.dumps(plan, indent=2)
             
-            # --- BRIDGE INTEGRATION (v1.8) ---
-            try:
-                from api.ws_handlers import manager
-                import uuid
-                actions = plan 
-                if actions:
-                    first_action = actions[0]
-                    action_id = str(uuid.uuid4())
-                    await manager.broadcast_json({
-                        "type": "action.confirmation",
-                        "payload": {
-                            "action_id": action_id,
-                            "intent": first_action.get("action"),
-                            "summary": f"Allow {first_action.get('action')} with {first_action.get('params')}?",
-                            "execution_data": first_action
-                        }
-                    })
-            except Exception as e:
-                print(f"Failed to trigger bridge: {e}")
+            # --- CHAINING LOGIC (v1.9) ---
+            import uuid
+            plan_id = str(uuid.uuid4())
+            self._active_plans[plan_id] = plan
+            self._plan_progress[plan_id] = 0
+            
+            if plan:
+                await self._trigger_step(plan_id)
 
-            return f"I have created a plan for this task:\n\n```json\n{steps_str}\n```\n\n(Check your screen for confirmation dialog)"
+            return f"I have created a plan with {len(plan)} steps.\n\n```json\n{steps_str}\n```\n\n(Follow instructions on screen)"
 
         elif intent == "VISION":
             from core.agents.vision_agent import vision_agent
@@ -235,5 +237,78 @@ class LLMService:
                      # Retry once
                      response = await local_engine.generate(full_prompt + "\nSystem: Previous answer was off-topic. Try again.")
                 return response
+
+    async def _trigger_step(self, plan_id):
+        """
+        Triggers the next step in the plan.
+        """
+        plan = self._active_plans.get(plan_id)
+        idx = self._plan_progress.get(plan_id, 0)
+        
+        if idx >= len(plan):
+            return
+            
+        action = plan[idx]
+        import uuid
+        action_id = str(uuid.uuid4())
+        
+        # Elevate safety if plan is long
+        is_elevated = len(plan) > 3
+        
+        # Store pending
+        self._pending_actions[action_id] = {
+            "action": action, 
+            "plan_id": plan_id
+        }
+        
+        # Broadcast confirmation request
+        from api.ws_handlers import manager
+        summary = f"Allow Step {idx+1}/{len(plan)}: {action.get('action')} {action.get('params')}?"
+        if is_elevated:
+            summary = "[ELEVATED] " + summary
+            
+        await manager.broadcast_json({
+            "type": "action.confirmation",
+            "payload": {
+                "action_id": action_id,
+                "intent": action.get("action"),
+                "summary": summary,
+                "execution_data": action,
+                "sequence_id": plan_id
+            }
+        })
+
+    async def confirm_action(self, action_id: str):
+        """
+        Called when user confirms an action via UI.
+        """
+        if action_id not in self._pending_actions:
+            return "Action expired or unknown."
+            
+        data = self._pending_actions.pop(action_id)
+        action = data['action']
+        plan_id = data['plan_id']
+        
+        # Execute
+        print(f"Executing Action: {action}")
+        import httpx
+        try:
+             async with httpx.AsyncClient() as client:
+                 await client.post("http://localhost:8001/action/run", json={
+                     "action": action.get("action"),
+                     "params": action.get("params"),
+                     "mode": "REAL"
+                 })
+                 
+        except Exception as e:
+            print(f"Execution Error: {e}")
+            
+        # Increment Step
+        if plan_id in self._plan_progress:
+            self._plan_progress[plan_id] += 1
+            # Trigger next
+            await self._trigger_step(plan_id)
+            
+        return "Executed"
 
 llm_service = LLMService()
