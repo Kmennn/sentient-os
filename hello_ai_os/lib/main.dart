@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:hello_ai_os/services/sync_service.dart';
+import 'package:hello_ai_os/services/voice_service.dart';
 import 'package:hello_ai_os/ui/widgets/glass_container.dart';
 import 'package:hello_ai_os/ui/pages/diagnostics_panel.dart';
 import 'package:hello_ai_os/ui/pages/model_manager_page.dart';
 import 'package:hello_ai_os/ui/pages/task_planner_page.dart';
 import 'package:hello_ai_os/ui/pages/vision_page.dart';
 import 'package:hello_ai_os/ui/pages/tools_page.dart';
+import 'package:hello_ai_os/ui/pages/privacy_page.dart';
 
 void main() {
   runApp(const SentientOSApp());
@@ -242,9 +244,33 @@ class _SentientShellState extends State<SentientShell> {
       );
       setState(() => _isListening = false);
     } else {
-      // Desktop: In future, initialize real mic here.
-      // For now, we simulate listening.
-      _addMessage("SYSTEM", "Microphone active (simulated).", true);
+      // Real Voice Service
+      if (_isListening) {
+        voiceService.start();
+        _addMessage("SYSTEM", "Voice Service Active.", true);
+
+        // Listen for transcriptions
+        voiceService.transcription.listen((text) {
+          if (text.startsWith("[System]")) {
+            // System msg
+            if (!text.contains("Listening")) {
+              // _addMessage("SYSTEM", text, true);
+            }
+          } else {
+            _input.text = text; // Just put into input for now? or append?
+            // Or auto-send?
+            // "Continuous STT" usually implies dictation.
+            // We'll update the input field live.
+
+            // If we want auto-send on final, we need logic.
+            // For now, let's just show it in input.
+            setState(() {});
+          }
+        });
+      } else {
+        voiceService.stop();
+        _addMessage("SYSTEM", "Voice Service Stopped.", true);
+      }
     }
   }
 
@@ -526,6 +552,20 @@ class _SentientShellState extends State<SentientShell> {
                                   ),
                                 ),
                               ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.security,
+                                size: 20,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PrivacyPage(),
+                                ),
+                              ),
+                              tooltip: "Privacy & Security",
                             ),
                           ],
                         ),

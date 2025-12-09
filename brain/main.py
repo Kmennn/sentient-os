@@ -18,7 +18,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from api.voice_routes import router as voice_router
+from api.system_routes import router as system_router
+
 app.include_router(api_router, prefix="/v1")
+app.include_router(privacy_router, prefix="/v1")
+app.include_router(voice_router, prefix="/v1")
+app.include_router(system_router, prefix="/v1")
 app.include_router(ws_router)
 
 if __name__ == "__main__":

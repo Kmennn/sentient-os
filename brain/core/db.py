@@ -94,6 +94,30 @@ def init_db():
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tools_name_ts ON tool_invocations(tool_name, timestamp DESC)")
 
+    # v1.10 Privacy & Consent
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id TEXT PRIMARY KEY,
+            username TEXT,
+            consent_memory BOOLEAN DEFAULT 0,
+            consent_vision BOOLEAN DEFAULT 0,
+            consent_actions BOOLEAN DEFAULT 0,
+            created_at INTEGER
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            action TEXT,
+            resource TEXT,
+            decision TEXT, -- ALLOW/DENY
+            reason TEXT,
+            timestamp INTEGER
+        )
+    """)
+
     conn.commit()
     conn.close()
     print(f"Database initialized at {DB_PATH}")
