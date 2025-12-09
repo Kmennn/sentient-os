@@ -13,7 +13,7 @@ class _ToolsPageState extends State<ToolsPage> {
   final _toolController = TextEditingController(text: "date_time");
   final _paramsController = TextEditingController(text: "{}");
 
-  List<Map<String, dynamic>> _history = [];
+  final List<Map<String, dynamic>> _history = [];
   bool _isLoading = false;
 
   Future<void> _runTool() async {

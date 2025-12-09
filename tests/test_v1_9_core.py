@@ -4,9 +4,9 @@ import os
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 
-# Imports (Assumes conftest sets path)
-from core.tools.process_list import ProcessListTool, DiskUsageTool
+# Imports
 from core.tools.registry import registry
+from core.tools.process_list import ProcessListTool, DiskUsageTool
 from core.agents.deep_research_agent import DeepResearchAgent
 
 @pytest.mark.asyncio

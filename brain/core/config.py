@@ -9,6 +9,7 @@ class Config:
     # GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # Removed for Offline Mode
     
     # Local Model Configuration
+    VERSION = "1.9.0"
     MODEL_MODE = os.getenv("MODEL_MODE", "local")
     MODEL_PATH = os.getenv("MODEL_PATH", "./models/main/")
     EMBEDDING_MODEL_PATH = os.getenv("EMBEDDING_MODEL_PATH", "./models/embed/")
