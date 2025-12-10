@@ -73,6 +73,7 @@ class _SentientShellState extends State<SentientShell> {
   String _osType = "Unknown";
   int _procCount = 0;
   Map<String, dynamic> _rawBodyStats = {};
+  String _liveTranscript = "";
 
   Timer? _telemetryTimer;
 
@@ -118,9 +119,32 @@ class _SentientShellState extends State<SentientShell> {
       }
       if (msg['type'] == 'action.cancelled') {
         _addMessage("SYSTEM", "🚫 Action cancelled by system.", true);
-        // If dialog is open, it should ideally close, but for now log it.
         if (Navigator.canPop(context)) {
           // This is risky if we pop the wrong thing, sticking to message for now.
+        }
+      }
+
+      // Voice Transcript
+      if (msg['type'] == 'voice.transcript') {
+        final payload = msg['payload'];
+        final text = payload['text'];
+        final isFinal = payload['is_final'] ?? false;
+        if (mounted) {
+          setState(() {
+            _liveTranscript = text;
+            if (isFinal) {
+              _input.text = text; // auto-fill input
+              // Optional: _send();
+            }
+          });
+
+          // Clear after delay if final or long pause?
+          // For now, let's keep it until new one comes or manual clear.
+          if (isFinal) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) setState(() => _liveTranscript = "");
+            });
+          }
         }
       }
     });
@@ -610,6 +634,35 @@ class _SentientShellState extends State<SentientShell> {
                                 ),
                               ),
                             ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Live Transcript Overlay
+                if (_liveTranscript.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: GlassContainer(
+                      padding: const EdgeInsets.all(16),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.record_voice_over,
+                            color: Colors.amberAccent,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _liveTranscript,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
                           ),
                         ],
                       ),
