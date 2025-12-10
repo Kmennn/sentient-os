@@ -1,7 +1,13 @@
-
 import pytest
+import sys
+import os
 from fastapi.testclient import TestClient
-from brain.main import app
+
+# Try direct import first (path via conftest), then fallback if needed
+try:
+    from main import app
+except ImportError:
+    from brain.main import app
 
 def test_voice_stream_websocket():
     # WebSocket test requires the server to be runnable or using TestClient with websocket support
