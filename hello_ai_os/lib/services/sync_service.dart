@@ -20,6 +20,17 @@ class SyncService {
   final _wakeController = StreamController<bool>.broadcast();
   Stream<bool> get wakeEvents => _wakeController.stream;
 
+  // v1.10: Realtime Feeds
+  final _diagnosticsController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get diagnosticsStream =>
+      _diagnosticsController.stream;
+
+  final _agentEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get agentEventStream =>
+      _agentEventController.stream;
+
   bool get isConnected => _channel != null;
   Timer? _reconnectTimer;
 
@@ -47,6 +58,16 @@ class SyncService {
             // Pong handling
             if (json['type'] == 'status.pong' || json['type'] == 'pong') {
               // Reset keepalive timer if we had one
+            }
+
+            // v1.10 Handling
+            if (json['type'] == 'diagnostic:panel') {
+              _diagnosticsController.add(json);
+              return; // Don't spam main message stream
+            }
+            if (json['type'] == 'agent:event') {
+              _agentEventController.add(json);
+              return;
             }
 
             _messageController.add(json);

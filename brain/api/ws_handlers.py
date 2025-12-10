@@ -1,34 +1,12 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import List, Dict
-from core.llm_service import llm_service
+from core.llm.llm_service import LLMService
 from core.memory_service import memory_service
+from sync.broadcast import broadcast_service as manager
 import json
 
 router = APIRouter()
 
-class ConnectionManager:
-    def __init__(self):
-        # Store active connections. In production, this would be Redis Pub/Sub.
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-    async def broadcast_json(self, data: dict):
-        await self.broadcast(json.dumps(data))
-
-manager = ConnectionManager()
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -120,6 +98,10 @@ async def websocket_endpoint(websocket: WebSocket):
             # Store context
             memory_service.add_message(user_id, "user", content)
             memory_service.add_message(user_id, "assistant", response_text)
+            
+            # v1.10: Broadcast Memory Update
+            # In a real system, we'd summarize the new state. For now, sending a signal.
+            await manager.broadcast_memory_update(f"New interaction from {user_id}")
 
             # Reply (Legacy)
             if msg_type == "chat":
