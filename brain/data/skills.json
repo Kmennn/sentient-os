@@ -1,0 +1,102 @@
+{
+  "safe_move": {
+    "name": "safe_move",
+    "points": [
+      {
+        "t": 0,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      {
+        "t": 1,
+        "x": 0.1,
+        "y": 0,
+        "z": 0
+      }
+    ],
+    "metadata": {
+      "duration": 1,
+      "required_affordance": "use"
+    }
+  },
+  "crash_move": {
+    "name": "crash_move",
+    "points": [
+      {
+        "t": 0,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      {
+        "t": 1,
+        "x": 0,
+        "y": 0,
+        "z": -0.5
+      }
+    ],
+    "metadata": {
+      "duration": 1,
+      "required_affordance": "use"
+    }
+  },
+  "push": {
+    "name": "push",
+    "points": [
+      {
+        "t": 0,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      {
+        "t": 1,
+        "x": 0.5,
+        "y": 0,
+        "z": 0
+      }
+    ],
+    "metadata": {
+      "duration": 5.0,
+      "required_affordance": "use"
+    }
+  },
+  "pour": {
+    "name": "pour",
+    "points": [
+      {
+        "t": 0,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    ],
+    "metadata": {
+      "duration": 1,
+      "required_affordance": "use"
+    }
+  },
+  "legacy_skill": {
+    "name": "legacy_skill",
+    "points": [],
+    "metadata": {
+      "duration": 1.0,
+      "required_affordance": "use"
+    }
+  },
+  "grasp": {
+    "name": "grasp",
+    "points": [
+      {
+        "t": 0,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    ],
+    "metadata": {
+      "duration": 1
+    }
+  }
+}

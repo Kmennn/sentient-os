@@ -1,0 +1,19 @@
+{
+  "mission_id": "e6c8245a-d980-4da1-b645-4e2440942b2c",
+  "contract": {
+    "name": "Unnamed Mission",
+    "mission_id": "e6c8245a-d980-4da1-b645-4e2440942b2c",
+    "allowed_actions": [
+      "pick",
+      "place"
+    ],
+    "allowed_objects": [
+      "cup",
+      "table"
+    ],
+    "max_duration": 60.0,
+    "autonomy_level": "EXECUTE"
+  },
+  "state": "EXECUTING",
+  "current_step_index": 2
+}

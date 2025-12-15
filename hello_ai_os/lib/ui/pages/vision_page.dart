@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:typed_data';
 
 class VisionPage extends StatefulWidget {
   const VisionPage({super.key});
@@ -14,7 +13,7 @@ class VisionPage extends StatefulWidget {
 class _VisionPageState extends State<VisionPage> {
   bool _isLoading = false;
   Uint8List? _currentImage;
-  List<Uint8List> _recentImages = []; // Last 5
+  final List<Uint8List> _recentImages = []; // Last 5
 
   String _ocrText = "";
   List<dynamic> _tags = [];
