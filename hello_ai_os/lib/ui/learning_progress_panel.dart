@@ -68,14 +68,12 @@ class LearningProgressPanel extends StatelessWidget {
                 style: TextStyle(color: Colors.white30),
               )
             else
-              ...aggregatedRules.entries
-                  .map(
-                    (e) => Text(
-                      "• ${e.key}: ${e.value}",
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  )
-                  .toList(),
+              ...aggregatedRules.entries.map(
+                (e) => Text(
+                  "• ${e.key}: ${e.value}",
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ),
           ],
         ),
       ),

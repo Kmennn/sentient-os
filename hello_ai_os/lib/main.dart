@@ -10,8 +10,14 @@ import 'package:hello_ai_os/ui/pages/model_manager_page.dart';
 import 'package:hello_ai_os/ui/pages/task_planner_page.dart';
 import 'package:hello_ai_os/ui/pages/vision_page.dart';
 import 'package:hello_ai_os/ui/pages/tools_page.dart';
+import 'package:hello_ai_os/ui/pages/system_status_panel.dart';
+
+import 'package:hello_ai_os/services/state_stream_service.dart';
 
 void main() {
+  // v7.1 State Stream Listener (Debug Only)
+  final streamService = StateStreamService();
+
   runApp(const SentientOSApp());
 }
 
@@ -509,6 +515,20 @@ class _SentientShellState extends State<SentientShell> {
                                 ),
                               ),
                               tooltip: "Tools Framework",
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.stream,
+                                size: 20,
+                                color: Colors.cyanAccent,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SystemStatusPanel(),
+                                ),
+                              ),
+                              tooltip: "Transparency Panel",
                             ),
                             GestureDetector(
                               onLongPress: _toggleAutoMode,

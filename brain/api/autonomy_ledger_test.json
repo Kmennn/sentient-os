@@ -1,0 +1,30 @@
+[
+  {
+    "decision_id": "fbbe606d-58fc-46c7-a1f1-7dd818d8a54a",
+    "decision_type": "suggested",
+    "timestamp": 1766067041.4818673,
+    "suggestion_id": "ab36f651-ebf4-4ed0-a42e-af8e60bba18b",
+    "action_id": "maintenance_scan",
+    "reason": "System is idle. Would you like to run maintenance tasks?",
+    "trust_score": 0.9,
+    "focus_state": "free",
+    "presence_state": "alone",
+    "interrupt_style": "always_ask",
+    "device_id": "test_dev",
+    "was_auto": false
+  },
+  {
+    "decision_id": "cfa3bb22-d8bb-4a9e-b064-4d083100e329",
+    "decision_type": "accepted",
+    "timestamp": 1766067041.4838674,
+    "suggestion_id": "ab36f651-ebf4-4ed0-a42e-af8e60bba18b",
+    "action_id": "maintenance_scan",
+    "reason": "",
+    "trust_score": 0.89999933330218,
+    "focus_state": "free",
+    "presence_state": "alone",
+    "interrupt_style": "always_ask",
+    "device_id": "test_dev",
+    "was_auto": false
+  }
+]

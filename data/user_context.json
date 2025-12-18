@@ -1,0 +1,22 @@
+{
+  "last_save": 1766069431.6346192,
+  "focus_patterns": [],
+  "interrupt_settings": {
+    "user_id": "user_default",
+    "style": "always_ask"
+  },
+  "interrupt_schedule": {
+    "user_id": "user_default",
+    "timezone": "local",
+    "windows": [
+      {
+        "start_time": "09:00",
+        "end_time": "18:00",
+        "mode": "important_only",
+        "name": "Work Hours"
+      }
+    ]
+  },
+  "manual_focus_expiry": 1766070931.634112,
+  "presence_override": "alone"
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "decision_id": "6567f1d6-39a0-4c27-b01d-f3c3fd949b7f",
+    "decision_type": "suggested",
+    "timestamp": 1766067234.8746555,
+    "suggestion_id": "s1",
+    "action_id": "a1",
+    "reason": "msg1",
+    "trust_score": 0.5,
+    "focus_state": "free",
+    "presence_state": "alone",
+    "interrupt_style": "always_ask",
+    "device_id": "unknown",
+    "was_auto": false
+  },
+  {
+    "decision_id": "5534b118-c2fe-4db2-9ad2-293933d3e51f",
+    "decision_type": "accepted",
+    "timestamp": 1766067234.88642,
+    "suggestion_id": "s1",
+    "action_id": "a1",
+    "reason": "",
+    "trust_score": 0.5,
+    "focus_state": "free",
+    "presence_state": "alone",
+    "interrupt_style": "always_ask",
+    "device_id": "unknown",
+    "was_auto": false
+  },
+  {
+    "decision_id": "9e252ad6-f324-46ca-a294-e387c828ab3d",
+    "decision_type": "auto_executed",
+    "timestamp": 1766067234.8980815,
+    "suggestion_id": "s2",
+    "action_id": "a2",
+    "reason": "Policy",
+    "trust_score": 0.5,
+    "focus_state": "free",
+    "presence_state": "alone",
+    "interrupt_style": "always_ask",
+    "device_id": "unknown",
+    "was_auto": true
+  }
+]

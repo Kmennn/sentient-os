@@ -24,7 +24,7 @@ class TaskTimelinePanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            ...steps.map((step) => _buildStep(step)).toList(),
+            ...steps.map((step) => _buildStep(step)),
 
             if (failureReason != null)
               Padding(

@@ -1,63 +1,45 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from api.routes import router as api_router
-from api.ws_handlers import router as ws_router
-from core.config import config
+import logging
+import sys
+import os
 import asyncio
 import threading
-import time
-import logging
+import uvicorn
 
-logger = logging.getLogger("BrainStartup")
+# Ensure brain can be imported
+sys.path.append(os.getcwd())
 
-# Import v2.4 Subsystems
-try:
-    from brain.robotics.ros_bridge import ros_bridge
-    from brain.autonomy.spatial_autonomy_engine import spatial_autonomy
-    SUBSYSTEMS_AVAILABLE = True
-except ImportError:
-    SUBSYSTEMS_AVAILABLE = False
-    logger.warning("v2.4 Subsystems not found (ImportError).")
+from brain.missions.mission_scheduler import mission_scheduler
+from brain.api.stream import app
 
-def autonomy_loop():
-    while True:
-        try:
-            if SUBSYSTEMS_AVAILABLE and spatial_autonomy.active:
-                spatial_autonomy.tik_tok()
-        except Exception as e:
-            logger.error(f"Autonomy Loop Error: {e}")
-        time.sleep(1.0)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("HeadlessBrain")
 
-app = FastAPI(title="Sentient OS Brain", version="0.1.0")
+def run_scheduler_tick():
+    """Blocking loop for scheduler ticking"""
+    try:
+        while True:
+            # We must be careful if EventBus emission calls Async code from Sync context.
+            # Ideally scheduler should be async too or EventBus uses call_soon_threadsafe if loop exists.
+            # But here we are in a Thread.
+            # For v7.1 MVP: Simple Loop.
+            
+            action = mission_scheduler.tick()
+            if action:
+                logger.info(f"Tick Action: {action}")
+            import time
+            time.sleep(1.0)
+    except Exception as e:
+        logger.error(f"Scheduler Loop Crash: {e}")
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-# Allow frontend to call this backend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(api_router, prefix="/v1")
-app.include_router(ws_router)
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Brain Starting Up...")
-    if SUBSYSTEMS_AVAILABLE:
-        # Start ROS (Initialized on import, but good to log)
-        logger.info(f"ROS Bridge Mock Mode: {ros_bridge.is_mock}")
-        
-        # Start Autonomy Loop
-        spatial_autonomy.start_loop()
-        t = threading.Thread(target=autonomy_loop, daemon=True)
-        t.start()
-        logger.info("Spatial Autonomy Loop Started (Background Thread)")
+def main():
+    logger.info("Initializing Headless Brain v7.1 (w/ Stream)...")
+    
+    # Start Scheduler in separate thread so it doesn't block API
+    scheduler_thread = threading.Thread(target=run_scheduler_tick, daemon=True)
+    scheduler_thread.start()
+    
+    logger.info("Starting Stream API on 0.0.0.0:8000...")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host=config.HOST, port=config.PORT, reload=True)
+    main()

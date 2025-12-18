@@ -28,6 +28,23 @@ class MissionContract:
     
     # Metadata
     created_at: float = field(default_factory=time.time)
+    created_by: Optional[str] = None # User ID
+    approved_by: Optional[str] = None # User ID
+    execution_role: Optional['UserRole'] = None
 
     def is_expired(self) -> bool:
         return (time.time() - self.created_at) > self.max_duration
+
+    def validate_authority(self, user_role: 'UserRole') -> bool:
+        """
+        Check if the executing role matches the required execution role.
+        """
+        if self.execution_role and self.execution_role != user_role:
+             # Basic hierarchy check: Owner > Operator > Observer
+             # If mission requires OPERATOR, OWNER is also fine.
+            from brain.auth.role import UserRole
+            if user_role == UserRole.OWNER:
+                return True
+            return False
+            
+        return True

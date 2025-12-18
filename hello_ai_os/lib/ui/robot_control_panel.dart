@@ -13,9 +13,9 @@ class _RobotControlPanelState extends State<RobotControlPanel> {
 
   void _cycleMode() {
     setState(() {
-      if (_mode == "SIMULATION")
+      if (_mode == "SIMULATION") {
         _mode = "DRY_RUN";
-      else if (_mode == "DRY_RUN")
+      } else if (_mode == "DRY_RUN")
         _mode = "LIVE";
       else
         _mode = "SIMULATION";
