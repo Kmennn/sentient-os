@@ -21,6 +21,7 @@ class DecisionType(Enum):
     EMERGENCY_ACK_CREATED = "emergency_ack_created"
     EMERGENCY_ACKNOWLEDGED = "emergency_acknowledged"
     EMERGENCY_ESCALATED = "emergency_escalated"
+    CONTEXTUAL_SEARCH_PERFORMED = "contextual_search_performed"
 
 @dataclass
 class AutonomyDecision:

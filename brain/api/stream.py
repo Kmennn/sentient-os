@@ -13,6 +13,7 @@ from brain.presence.client import ClientType
 from brain.api.autonomy_history import router as autonomy_router
 from brain.api.external_signals import router as external_signals_router
 from brain.api.emergency import router as emergency_router
+from brain.api.contextual import router as contextual_router
 
 logger = logging.getLogger("API")
 
@@ -20,6 +21,7 @@ app = FastAPI()
 app.include_router(autonomy_router)
 app.include_router(external_signals_router)
 app.include_router(emergency_router)
+app.include_router(contextual_router)
 
 def get_current_state() -> SystemState:
     # Build Snapshot from Scheduler

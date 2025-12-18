@@ -62,6 +62,7 @@ from brain.external.external_suggestion_policy import ExternalSuggestionPolicy
 from brain.external.external_suggestion_adapter import ExternalSuggestionAdapter
 from brain.external.emergency_visibility_policy import EmergencyVisibilityPolicy
 from brain.external.emergency_escalation import EmergencyEscalationManager
+from brain.contextual.contextual_search_engine import ContextualSearchEngine
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -226,6 +227,7 @@ class MissionScheduler:
         self.external_adapter = ExternalSuggestionAdapter()
         self.emergency_policy = EmergencyVisibilityPolicy()
         self.emergency_manager = EmergencyEscalationManager()
+        self.contextual_search = ContextualSearchEngine()
         
         # ... (Services) ...
 
@@ -802,6 +804,11 @@ class MissionScheduler:
                     # v12.3 Create Acknowledgment Tracker
                     ack = self.emergency_manager.create_emergency(sig.signal_id, suggestion.suggestion_id)
                     self._log_autonomy_decision(DecisionType.EMERGENCY_ACK_CREATED, suggestion_id=suggestion.suggestion_id, reason=f"Emergency ID: {ack.emergency_id}", was_auto=False)
+                    
+                    # v13.0 Contextual Search (Read-Only)
+                    # Trigger analysis on Critical Signal
+                    search_res = self.contextual_search.perform_search(query=sig.title + " mitigation", signal_id=sig.signal_id)
+                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_SEARCH_PERFORMED, suggestion_id=suggestion.suggestion_id, reason=f"Conf: {search_res.confidence_score}", was_auto=False)
                 
                 self.proactive_engine.active_suggestions.append(suggestion)
                 print(f"[EXTERNAL] Suggestion Created: {suggestion.message} (Vis: {suggestion.visibility_level.value})")
