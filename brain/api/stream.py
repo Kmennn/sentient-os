@@ -20,6 +20,7 @@ from brain.api.memory import router as memory_router
 from brain.api.preferences import router as preferences_router
 from brain.api.reflection import router as reflection_router
 from brain.api.adjustments import router as adjustments_router
+from brain.api.sync import router as sync_router
 
 logger = logging.getLogger("API")
 
@@ -32,7 +33,7 @@ app.include_router(memory_router)
 app.include_router(preferences_router)
 app.include_router(reflection_router)
 app.include_router(adjustments_router)
-app.include_router(adjustments_router)
+app.include_router(sync_router)
 app.include_router(memory_router)
 app.include_router(preferences_router)
 

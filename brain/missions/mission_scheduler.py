@@ -75,6 +75,8 @@ from brain.reflection.reflection_event import ReflectionEvent, ReflectionEventTy
 from brain.reflection.reflection_engine import ReflectionEngine
 from brain.reflection.adjustment_engine import AdjustmentEngine
 from brain.agents.agent_context import AgentContext, AgentRole, OBSERVER_CONTEXT, ANALYST_CONTEXT, GOVERNOR_CONTEXT
+from brain.sync.state_exporter import StateExporter
+from brain.sync.state_importer import StateImporter
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -253,6 +255,11 @@ class MissionScheduler:
         
         # v17.0
         self.current_agent_phase = AgentRole.SYSTEM.value
+        
+        # v18.0
+        self.state_exporter = StateExporter(self.preference_store, self.meaning_memory, self.autonomy_ledger, self)
+        self.state_importer = StateImporter(self.preference_store, self.meaning_memory, self.autonomy_ledger)
+        self.latest_sync_state = None
         
         # ... (Services) ...
 
@@ -484,6 +491,11 @@ class MissionScheduler:
             entries = self.autonomy_ledger.get_entries()[-100:]
             self.adjustment_engine.scan_ledger_for_proposals(entries, context=GOVERNOR_CONTEXT)
             self.current_agent_phase = AgentRole.SYSTEM.value # Reset
+        
+        # v18.0 Export State Snapshot (Every tick, or throttled? Prompt says 'On tick end')
+        # We'll throttle to avoid IO hammer
+        if time.time() % 10 < 1: # Every ~10s
+             self.latest_sync_state = self.state_exporter.export_sync_state()
         
         for s in candidates:
             # v15.1 Filtering Logic

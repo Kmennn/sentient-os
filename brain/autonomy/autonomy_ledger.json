@@ -12,5 +12,47 @@
     "interrupt_style": "unknown",
     "device_id": "unknown",
     "was_auto": true
+  },
+  {
+    "decision_id": "ca1f00b3-0f61-4dff-9691-d08b16cfbc18",
+    "decision_type": "sync_state_import_attempt",
+    "timestamp": 1766137760.2664773,
+    "suggestion_id": null,
+    "action_id": null,
+    "reason": "Imported Sync State from external_peer",
+    "trust_score": 0.0,
+    "focus_state": "unknown",
+    "presence_state": "unknown",
+    "interrupt_style": "unknown",
+    "device_id": "unknown",
+    "was_auto": true
+  },
+  {
+    "decision_id": "92f64f47-bc03-4a10-934d-a5eaffb0ec00",
+    "decision_type": "sync_state_import_attempt",
+    "timestamp": 1766137829.7569454,
+    "suggestion_id": null,
+    "action_id": null,
+    "reason": "Imported Sync State from external_peer",
+    "trust_score": 0.0,
+    "focus_state": "unknown",
+    "presence_state": "unknown",
+    "interrupt_style": "unknown",
+    "device_id": "unknown",
+    "was_auto": true
+  },
+  {
+    "decision_id": "5cb7e686-f810-4a42-a37b-4f20224b0496",
+    "decision_type": "sync_state_import_attempt",
+    "timestamp": 1766137895.1034906,
+    "suggestion_id": null,
+    "action_id": null,
+    "reason": "Imported Sync State from external_peer",
+    "trust_score": 0.0,
+    "focus_state": "unknown",
+    "presence_state": "unknown",
+    "interrupt_style": "unknown",
+    "device_id": "unknown",
+    "was_auto": true
   }
 ]

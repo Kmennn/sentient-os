@@ -1,0 +1,8 @@
+{
+  "SYNC_TEST": {
+    "signal_domain": "SYNC_TEST",
+    "relevance_score": 0.95,
+    "interaction_count": 0,
+    "last_interaction_ts": 0
+  }
+}

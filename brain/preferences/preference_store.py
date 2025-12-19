@@ -112,3 +112,6 @@ class PreferenceStore:
             "level": level,
             "score": meaning_score
         }
+
+    def get_all_explicit_preferences(self) -> Dict[str, ExplicitPreference]:
+        return self._preferences.copy()

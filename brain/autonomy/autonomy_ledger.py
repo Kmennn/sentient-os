@@ -38,6 +38,9 @@ class DecisionType(Enum):
     ADJUSTMENT_REJECTED = "adjustment_rejected"
     AGENT_DECISION = "agent_decision"
     AGENT_BOUNDARY_VIOLATION = "agent_boundary_violation"
+    SYNC_STATE_EXPORTED = "sync_state_exported"
+    SYNC_STATE_IMPORT_ATTEMPT = "sync_state_import_attempt"
+    SYNC_STATE_REJECTED = "sync_state_rejected"
 
 @dataclass
 class AutonomyDecision:
