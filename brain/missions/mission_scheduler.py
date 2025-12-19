@@ -69,6 +69,7 @@ from brain.memory.contextual_memory import ContextualMemory
 from brain.memory.contextual_pattern_analyzer import ContextualPatternAnalyzer
 from brain.memory.pattern_narrator import PatternNarrator
 from brain.memory.meaning_memory import MeaningMemory, InteractionType
+from brain.preferences.preference_store import PreferenceStore, ExplicitPreference, ImportanceLevel
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -239,6 +240,7 @@ class MissionScheduler:
         self.pattern_analyzer = ContextualPatternAnalyzer(self.contextual_memory)
         self.pattern_narrator = PatternNarrator()
         self.meaning_memory = MeaningMemory()
+        self.preference_store = PreferenceStore(self.meaning_memory)
         
         # ... (Services) ...
 

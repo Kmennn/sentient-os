@@ -43,6 +43,8 @@ class SystemState(BaseModel):
     last_pattern_explanation_available: bool = False
     # v14.2
     meaning_memory_available: bool = False
+    # v15.0
+    explicit_preferences_available: bool = False
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}

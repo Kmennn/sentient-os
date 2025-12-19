@@ -28,6 +28,7 @@ class DecisionType(Enum):
     CONTEXTUAL_PATTERN_DETECTED = "contextual_pattern_detected"
     CONTEXTUAL_PATTERN_EXPLAINED = "contextual_pattern_explained"
     USER_MEANING_UPDATED = "user_meaning_updated"
+    EXPLICIT_PREFERENCE_SET = "explicit_preference_set"
 
 @dataclass
 class AutonomyDecision:

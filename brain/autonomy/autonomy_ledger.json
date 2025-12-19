@@ -40,5 +40,19 @@
     "interrupt_style": "always_ask",
     "device_id": "unknown",
     "was_auto": false
+  },
+  {
+    "decision_id": "cfce0fd6-4ff3-4a5d-87a6-9a5f77613685",
+    "decision_type": "explicit_preference_set",
+    "timestamp": 1766135655.189848,
+    "suggestion_id": null,
+    "action_id": null,
+    "reason": "Domain: SECURITY -> low",
+    "trust_score": 0.5,
+    "focus_state": "free",
+    "presence_state": "alone",
+    "interrupt_style": "always_ask",
+    "device_id": "unknown",
+    "was_auto": false
   }
 ]
