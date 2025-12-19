@@ -27,6 +27,7 @@ class DecisionType(Enum):
     CONTEXTUAL_MEMORY_STORED = "contextual_memory_stored"
     CONTEXTUAL_PATTERN_DETECTED = "contextual_pattern_detected"
     CONTEXTUAL_PATTERN_EXPLAINED = "contextual_pattern_explained"
+    USER_MEANING_UPDATED = "user_meaning_updated"
 
 @dataclass
 class AutonomyDecision:

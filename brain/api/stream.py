@@ -4,6 +4,8 @@ from brain.events.event_bus import event_bus
 from brain.events.event_types import EventType
 from brain.state.state_snapshot import SystemState, MissionModel, QueueItem
 from brain.missions.mission_scheduler import mission_scheduler
+from brain.autonomy.autonomy_ledger import DecisionType
+from brain.memory.meaning_memory import InteractionType
 import asyncio
 import logging
 
@@ -14,6 +16,7 @@ from brain.api.autonomy_history import router as autonomy_router
 from brain.api.external_signals import router as external_signals_router
 from brain.api.emergency import router as emergency_router
 from brain.api.contextual import router as contextual_router
+from brain.api.memory import router as memory_router
 
 logger = logging.getLogger("API")
 
@@ -22,6 +25,8 @@ app.include_router(autonomy_router)
 app.include_router(external_signals_router)
 app.include_router(emergency_router)
 app.include_router(contextual_router)
+app.include_router(memory_router)
+app.include_router(memory_router)
 
 def get_current_state() -> SystemState:
     # Build Snapshot from Scheduler
@@ -156,7 +161,9 @@ def get_current_state() -> SystemState:
         contextual_history_count=len(mission_scheduler.contextual_memory._history),
         last_pattern_detected=len(mission_scheduler.contextual_memory._history) > 3, # Proxy for "enough data"
         # v14.1
-        last_pattern_explanation_available=len(mission_scheduler.pattern_narrator._explanations) > 0
+        last_pattern_explanation_available=len(mission_scheduler.pattern_narrator._explanations) > 0,
+        # v14.2
+        meaning_memory_available=True
     )
 
 @app.post("/interrupts/{request_id}/respond")

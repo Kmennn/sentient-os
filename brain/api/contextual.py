@@ -38,5 +38,24 @@ def get_contextual_patterns(signal_title: str):
 def get_pattern_explanation(signal_title: str):
     explanation = mission_scheduler.pattern_narrator.get_explanation(signal_title)
     if explanation:
+        # v14.2 Record Meaning (View)
+        # Need domain. PatternInsight/Narrator doesn't explicitly store domain in the look-up map (keyed by title).
+        # But we can try to find it.
+        # Or Just use "contextual" if unknown?
+        # UserMeaning expects a domain string.
+        # PatternExplanation doesn't have domain.
+        # Let's try to lookup via memory store recent item?
+        # Or pass domain in "explain" and store it in PatternExplanation?
+        # Ideally PatternNarrator stores it.
+        # Let's assume we can find it or default.
+        domain = "unknown"
+        # Lookup logic:
+        # check memory for this title
+        mem = mission_scheduler.contextual_memory.get_recent(signal_title, days=1)
+        if mem:
+             domain = mem[0].get("domain", "unknown")
+             
+        mission_scheduler.record_meaning_interaction(domain, InteractionType.VIEW, source_id=signal_title)
+        
         return explanation.to_dict()
     raise HTTPException(status_code=404, detail="Explanation not found (or not generated yet)")

@@ -57,6 +57,7 @@ from brain.actions.action_registry import ActionRegistry
 from brain.autonomy.autonomy_policy import AutonomyPolicy
 from brain.autonomy.autonomy_ledger import AutonomyLedger, AutonomyDecision, DecisionType
 from brain.external.external_observer import ExternalObserver
+from brain.external.external_signal import ExternalSignal
 from brain.external.external_signal_classification import SignalRiskLevel
 from brain.external.external_suggestion_policy import ExternalSuggestionPolicy
 from brain.external.external_suggestion_adapter import ExternalSuggestionAdapter
@@ -67,6 +68,7 @@ from brain.contextual.contextual_narrator import ContextualNarrator
 from brain.memory.contextual_memory import ContextualMemory
 from brain.memory.contextual_pattern_analyzer import ContextualPatternAnalyzer
 from brain.memory.pattern_narrator import PatternNarrator
+from brain.memory.meaning_memory import MeaningMemory, InteractionType
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -236,6 +238,7 @@ class MissionScheduler:
         self.contextual_memory = ContextualMemory()
         self.pattern_analyzer = ContextualPatternAnalyzer(self.contextual_memory)
         self.pattern_narrator = PatternNarrator()
+        self.meaning_memory = MeaningMemory()
         
         # ... (Services) ...
 
@@ -471,14 +474,42 @@ class MissionScheduler:
             
         return displayable
 
+    def record_meaning_interaction(self, domain: str, interaction_type: InteractionType, source_id: str = "unknown"):
+        """Records a user interaction to update meaning memory."""
+        new_score = self.meaning_memory.record_interaction(domain, interaction_type)
+        self._log_autonomy_decision(
+            DecisionType.USER_MEANING_UPDATED, 
+            suggestion_id=source_id, 
+            reason=f"Type: {interaction_type.value}, Domain: {domain}, NewScore: {new_score:.2f}", 
+            was_auto=False
+        )
+
+    def _should_create_suggestion(self, classification: ExternalSignal) -> bool:
+        # Placeholder for actual logic
+        return True # Default to true for now
+
     def resolve_proactive_suggestion(self, suggestion_id: str, action: str):
         if action == "DISMISS":
             # 1. Find Suggestion for ID logic
             sg = next((s for s in self.proactive_engine.active_suggestions if s.suggestion_id == suggestion_id), None)
+            
+            # v14.2 Record Meaning (Dismissal)
+            if sg:
+                 # Suggestion usually has metadata or we infer domain from content?
+                 # Best if Suggestion object has 'classification' or 'domain'.
+                 # Let's check ProactiveSuggestion definition.
+                 # It has 'source', 'message'.
+                 # If it came from ExternalSignal, we might want to track the domain.
+                 # But ProactiveSuggestion might not have domain field.
+                 # Let's check `brain/proactive/proactive_suggestion.py`.
+                 # If not, we use "unknown" or infer.
+                 # For now, safe default "unknown".
+                 self.record_meaning_interaction("unknown", InteractionType.DISMISS, source_id=suggestion_id)
+            
             self.proactive_engine.dismiss(suggestion_id)
             print(f"Suggestion {suggestion_id} DISMISSED")
             if sg:
-                self._log_autonomy_decision(DecisionType.DISMISSED, suggestion_id, sg.action_id, was_auto=False)
+                self._log_autonomy_decision(DecisionType.EXTERNAL_SUGGESTION_BLOCKED, suggestion_id, sg.action_id, was_auto=False)
                 if sg.action_id:
                     self.autonomy_policy.record_dismissal(sg.action_id)
                 
