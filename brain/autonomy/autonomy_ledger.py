@@ -31,6 +31,8 @@ class DecisionType(Enum):
     EXPLICIT_PREFERENCE_SET = "explicit_preference_set"
     ALERT_FILTERED_BY_PREFERENCE = "alert_filtered_by_preference"
     ALERT_SHOWN_BY_PREFERENCE = "alert_shown_by_preference"
+    REFLECTION_POSITIVE = "reflection_positive"
+    REFLECTION_NEGATIVE = "reflection_negative"
 
 @dataclass
 class AutonomyDecision:

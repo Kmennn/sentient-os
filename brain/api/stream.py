@@ -18,6 +18,7 @@ from brain.api.emergency import router as emergency_router
 from brain.api.contextual import router as contextual_router
 from brain.api.memory import router as memory_router
 from brain.api.preferences import router as preferences_router
+from brain.api.reflection import router as reflection_router
 
 logger = logging.getLogger("API")
 
@@ -170,7 +171,10 @@ def get_current_state() -> SystemState:
         # v15.0
         explicit_preferences_available=True,
         # v15.1
-        last_alert_filtered=any(s.is_filtered for s in mission_scheduler.proactive_engine.active_suggestions)
+        last_alert_filtered=any(s.is_filtered for s in mission_scheduler.proactive_engine.active_suggestions),
+        # v16.0
+        last_reflection_signal=mission_scheduler.reflection_engine.last_reflection_signal,
+        reflection_confidence=mission_scheduler.reflection_engine.reflection_confidence
     )
 
 @app.post("/interrupts/{request_id}/respond")

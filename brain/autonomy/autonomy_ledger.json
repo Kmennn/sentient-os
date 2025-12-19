@@ -1,16 +1,16 @@
 [
   {
-    "decision_id": "99db2609-cf7d-4537-99e4-064a63a13d11",
-    "decision_type": "alert_filtered_by_preference",
-    "timestamp": 1766136109.2653377,
-    "suggestion_id": "suggestion_sys_1",
+    "decision_id": "c1cefa25-89f7-40ff-82ad-061554840e7a",
+    "decision_type": "reflection_positive",
+    "timestamp": 1766136466.4289157,
+    "suggestion_id": null,
     "action_id": null,
-    "reason": "Preference Filter: low < medium",
-    "trust_score": 0.5,
-    "focus_state": "free",
-    "presence_state": "alone",
-    "interrupt_style": "always_ask",
+    "reason": "Correct? User acknowledged 'FINANCE'.",
+    "trust_score": 0.0,
+    "focus_state": "unknown",
+    "presence_state": "unknown",
+    "interrupt_style": "unknown",
     "device_id": "unknown",
-    "was_auto": false
+    "was_auto": true
   }
 ]

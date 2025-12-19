@@ -47,6 +47,9 @@ class SystemState(BaseModel):
     explicit_preferences_available: bool = False
     # v15.1
     last_alert_filtered: bool = False
+    # v16.0
+    last_reflection_signal: str = None
+    reflection_confidence: float = 0.0
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}

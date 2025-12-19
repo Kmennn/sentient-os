@@ -71,6 +71,8 @@ from brain.memory.pattern_narrator import PatternNarrator
 from brain.memory.meaning_memory import MeaningMemory, InteractionType
 from brain.preferences.preference_store import PreferenceStore, ExplicitPreference, ImportanceLevel
 from brain.alerts.alert_importance import AlertImportanceResolver
+from brain.reflection.reflection_event import ReflectionEvent, ReflectionEventType
+from brain.reflection.reflection_engine import ReflectionEngine
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -243,6 +245,7 @@ class MissionScheduler:
         self.meaning_memory = MeaningMemory()
         self.preference_store = PreferenceStore(self.meaning_memory)
         self.alert_resolver = AlertImportanceResolver(self.preference_store)
+        self.reflection_engine = ReflectionEngine(self.autonomy_ledger)
         
         # ... (Services) ...
 
@@ -501,6 +504,12 @@ class MissionScheduler:
                      s.is_filtered = True
                      s.filtered_reason = f"Preference Filter: {imp.value} < {self.preference_store.min_display_threshold.value}"
                      self._log_autonomy_decision(DecisionType.ALERT_FILTERED_BY_PREFERENCE, suggestion_id=s.suggestion_id, reason=s.filtered_reason, was_auto=False)
+                     # v16.0 Reflection Hook
+                     self.reflection_engine.process_event(ReflectionEvent(
+                         event_type=ReflectionEventType.ALERT_FILTERED,
+                         domain=domain,
+                         item_id=s.suggestion_id
+                     ))
             else:
                  # It should show
                  if s.is_filtered:
@@ -508,6 +517,12 @@ class MissionScheduler:
                      s.is_filtered = False
                      s.filtered_reason = None
                      self._log_autonomy_decision(DecisionType.ALERT_SHOWN_BY_PREFERENCE, suggestion_id=s.suggestion_id, reason=f"Preference Allowed: {imp.value}", was_auto=False)
+                     # v16.0 Reflection Hook
+                     self.reflection_engine.process_event(ReflectionEvent(
+                         event_type=ReflectionEventType.ALERT_SHOWN,
+                         domain=domain,
+                         item_id=s.suggestion_id
+                     ))
             
             # Final output list construction (Existing logic + Filter check)
             # Only add if NOT filtered OR force visible?
@@ -553,17 +568,17 @@ class MissionScheduler:
             
             # v14.2 Record Meaning (Dismissal)
             if sg:
-                 # Suggestion usually has metadata or we infer domain from content?
-                 # Best if Suggestion object has 'classification' or 'domain'.
-                 # Let's check ProactiveSuggestion definition.
-                 # It has 'source', 'message'.
-                 # If it came from ExternalSignal, we might want to track the domain.
-                 # But ProactiveSuggestion might not have domain field.
-                 # Let's check `brain/proactive/proactive_suggestion.py`.
-                 # If not, we use "unknown" or infer.
-                 # For now, safe default "unknown".
-                 self.record_meaning_interaction("unknown", InteractionType.DISMISS, source_id=suggestion_id)
-            
+             # v15.1 Get Domain
+             domain = sg.metadata.get("domain", "unknown")
+             self.record_meaning_interaction(domain, InteractionType.DISMISS, source_id=suggestion_id)
+             
+             # v16.0 Reflection Hook
+             self.reflection_engine.process_event(ReflectionEvent(
+                 event_type=ReflectionEventType.ALERT_DISMISSED,
+                 domain=domain,
+                 item_id=suggestion_id
+             ))
+        
             self.proactive_engine.dismiss(suggestion_id)
             print(f"Suggestion {suggestion_id} DISMISSED")
             if sg:
@@ -577,7 +592,15 @@ class MissionScheduler:
             if not sg:
                  print(f"Suggestion {suggestion_id} not found.")
                  return
-                 
+             
+            # v16.0 Reflection Hook
+            domain = sg.metadata.get("domain", "unknown")
+            self.reflection_engine.process_event(ReflectionEvent(
+                 event_type=ReflectionEventType.ALERT_ACKED,
+                 domain=domain,
+                 item_id=suggestion_id
+            ))
+             
             self.proactive_engine.accept(suggestion_id)
             print(f"Suggestion {suggestion_id} ACCEPTED")
             self._log_autonomy_decision(DecisionType.ACCEPTED, suggestion_id, sg.action_id, was_auto=False)
