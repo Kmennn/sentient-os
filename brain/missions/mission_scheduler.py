@@ -181,12 +181,15 @@ class QueuedMission:
     blocked_until: float = field(compare=False, default=0.0)
     hints: List[OptimizationHint] = field(compare=False, default_factory=list)
 
+from brain.output.voice_output_manager import VoiceOutputManager
+
 class MissionScheduler:
     """
     Orchestrator for mission execution.
     Delegates logic to Services.
     """
     def __init__(self):
+        # ... (Previous init code) ...
         self._queue: List[QueuedMission] = []
         self._active_mission: Optional[QueuedMission] = None
         
@@ -205,6 +208,9 @@ class MissionScheduler:
         self._last_tick_duration_ms: float = 0.0
         self._backpressure_active: bool = False
         self._last_state_snapshot: dict = {}
+        
+        # H4: Voice Output Manager
+        self.voice_manager = VoiceOutputManager(self) # access to context via self
         
         # Event Bus
         self.event_bus = event_bus
@@ -1096,9 +1102,17 @@ class MissionScheduler:
     # NOTE:
     # No feature flags, experimental branches, or conditional behavior
     # are allowed in tick() during stabilization.
+    def _announce(self, text: str, force: bool = False):
+        """H4: Trigger voice output via manager."""
+        if hasattr(self, 'voice_manager'):
+           self.voice_manager.speak(text, force=force)
+
     def tick(self, override_now: float = None) -> Optional[str]:
         # S6: Measure Tick Duration
         tick_start = time.monotonic()
+        
+        # H4: Track Recovery State
+        prev_recovery = self.recovery_manager.state.level if self.recovery_manager.state else None
         
         # S5: Create Tick Context (Deterministic Scope)
         import uuid
@@ -1168,6 +1182,16 @@ class MissionScheduler:
         # Check override active properly
         if self.override_manager.get_active_token():
             self._last_state_snapshot["override_active"] = True
+
+        # H4: Check Recovery Transition
+        curr_recovery = self.recovery_manager.state.level if self.recovery_manager.state else None
+        if prev_recovery and curr_recovery and prev_recovery != curr_recovery:
+             # Import locally to compare if needed, or use string/value
+             # Assuming RecoveryLevel is available or check names
+             if curr_recovery.name == "HARD":
+                 self._announce("Attention. System entering Hard Recovery.", force=True)
+             elif prev_recovery.name == "HARD":
+                 self._announce("System Stable. Recovery complete.", force=True)
 
         self._tick_context = None # Clear Scope
         return self._cycle_decision_outcome if hasattr(self, '_cycle_decision_outcome') else None

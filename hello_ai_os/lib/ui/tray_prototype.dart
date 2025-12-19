@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:hello_ai_os/ui/widgets/glass_container.dart';
 
-// Standalone Prototype for H3 (Tray Interface)
+// Standalone Prototype for H3/H4 (Tray Interface)
 class TrayPrototype extends StatefulWidget {
   const TrayPrototype({super.key});
 
@@ -14,9 +13,12 @@ class TrayPrototype extends StatefulWidget {
 class _TrayPrototypeState extends State<TrayPrototype> {
   // Mock Data (Real world would stream)
   bool _shieldActive = false;
+  // H4: Voice Status
+  bool _voiceActive = false;
+  // Used for status display
   String _healthStatus = "OK";
-  List<String> _timeline = [];
-  List<Map<String, dynamic>> _suggestions = [];
+  List<String> _timeline = ["System Init"]; // Used
+  List<Map<String, dynamic>> _suggestions = []; // Used
 
   @override
   void initState() {
@@ -34,6 +36,9 @@ class _TrayPrototypeState extends State<TrayPrototype> {
         final data = json.decode(res.body);
         setState(() {
           _shieldActive = data['focus_state'] == 'focus_session';
+          _healthStatus = data['recovery_state'] ?? "OK";
+          // H4: Check if voice system is nominal (mocked)
+          _voiceActive = _healthStatus == "NONE" || _healthStatus == "OK";
         });
       }
       // Fetch suggestions, etc.
@@ -109,9 +114,24 @@ class _TrayPrototypeState extends State<TrayPrototype> {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white38, size: 16),
-            onPressed: () {}, // Open Settings
+          Row(
+            children: [
+              // H4: Voice Icon
+              Icon(
+                _voiceActive ? Icons.volume_up : Icons.volume_off,
+                color: _voiceActive ? Colors.white38 : Colors.white10,
+                size: 14,
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(
+                  Icons.settings,
+                  color: Colors.white38,
+                  size: 16,
+                ),
+                onPressed: () {}, // Open Settings
+              ),
+            ],
           ),
         ],
       ),
@@ -180,17 +200,33 @@ class _TrayPrototypeState extends State<TrayPrototype> {
           ),
         ),
         const SizedBox(height: 8),
-        _buildFeedItem(
-          Icons.auto_awesome,
-          "Suggestion",
-          "Optimize memory usage?",
-          true,
-        ),
-        _buildFeedItem(Icons.history, "Context", "Meeting ended 5m ago", false),
+        // Use Mock Data to clear lints
+        if (_timeline.isNotEmpty)
+          _buildFeedItem(Icons.history, "Context", _timeline.last, false),
+
+        if (_suggestions.isNotEmpty)
+          ..._suggestions.map(
+            (s) => _buildFeedItem(
+              Icons.auto_awesome,
+              s['title'] ?? "Suggestion",
+              s['desc'] ?? "",
+              true,
+            ),
+          ),
+
+        if (_suggestions.isEmpty)
+          _buildFeedItem(
+            Icons.auto_awesome,
+            "Suggestion",
+            "Optimize memory usage?",
+            true,
+          ),
+
+        const SizedBox(height: 8),
         _buildFeedItem(
           Icons.check_circle_outline,
           "System",
-          "Health check passed",
+          "Health: $_healthStatus",
           false,
         ),
       ],
