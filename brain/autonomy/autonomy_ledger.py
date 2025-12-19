@@ -44,6 +44,9 @@ class DecisionType(Enum):
     SYNC_CONFLICT_DETECTED = "sync_conflict_detected"
     SYNC_CONFLICT_RESOLVED = "sync_conflict_resolved"
     SYNC_CONFLICT_REJECTED = "sync_conflict_rejected"
+    ACTION_EXECUTED = "action_executed"
+    ACTION_BLOCKED = "action_blocked"
+    ACTION_REVERTED = "action_reverted"
 
 @dataclass
 class AutonomyDecision:

@@ -80,7 +80,9 @@ from brain.sync.state_importer import StateImporter
 from brain.sync.conflict_resolver import ConflictResolver
 from brain.timeline.timeline_builder import TimelineBuilder
 from brain.timeline.cognitive_summary import CognitiveSummaryEngine, CognitiveSummary
-from brain.timeline.system_confidence import ConfidenceEngine, SystemConfidence
+from brain.timeline.system_confidence import ConfidenceEngine, SystemConfidence, ConfidenceLevel
+from brain.actions.action_executor import ActionSandbox
+from brain.actions.action_capability import ActionCapability, ActionRisk
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -269,6 +271,7 @@ class MissionScheduler:
         self.last_summary: CognitiveSummary = None
         self.last_summary_time = 0
         self.last_confidence: SystemConfidence = None
+        self.action_sandbox = ActionSandbox(self.autonomy_ledger, self)
         
         # ... (Services) ...
 
@@ -415,6 +418,29 @@ class MissionScheduler:
         if self.last_confidence is None:
              self.get_summary() # trigger build
         return self.last_confidence
+
+    def is_safe_to_execute(self, cap: ActionCapability) -> bool:
+        # 1. System Confidence
+        conf = self.get_system_confidence()
+        if conf.level == ConfidenceLevel.LOW:
+            print(f"[Scheduler] Blocked {cap.action_id}: System Confidence is LOW.")
+            return False
+            
+        # 2. Focus State (Block non-essential if Focused)
+        if self.focus_state == "focus_session" and cap.risk_level != ActionRisk.LOW:
+             print(f"[Scheduler] Blocked {cap.action_id}: User in Deep Work.")
+             return False
+
+        # 3. Risk Profile
+        if cap.risk_level == ActionRisk.HIGH:
+             print(f"[Scheduler] Blocked {cap.action_id}: High Risk actions disabled in v20.0.")
+             return False
+             
+        if cap.risk_level == ActionRisk.MEDIUM and self.device_trust_score < 0.7:
+             print(f"[Scheduler] Blocked {cap.action_id}: Trust Score too low for Medium Risk.")
+             return False
+
+        return True
 
     def clear_presence(self):
         self.manual_presence_provider.clear()

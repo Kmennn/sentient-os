@@ -229,6 +229,20 @@ class SystemStatusPanel extends StatelessWidget {
                                   .toList(),
                         ),
                       ),
+                                    ),
+                                  )
+                                  .toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _ControlRow(
+                        label: "Safe Sandbox",
+                        child: _ControlButton(
+                            label: "TEST PING",
+                            color: Colors.cyanAccent,
+                            onTap: () => _apiCall("/actions/demo_safe_ping/execute", method: "POST"),
+                        ),
+                      ),
                     ],
                   ),
                 ),
