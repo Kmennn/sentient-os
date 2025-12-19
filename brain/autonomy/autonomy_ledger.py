@@ -52,6 +52,9 @@ class DecisionType(Enum):
     ACTION_ROLLBACK_FAILED = "action_rollback_failed"
     AUTONOMY_BUDGET_CONSUMED = "autonomy_budget_consumed"
     AUTONOMY_BUDGET_EXCEEDED = "autonomy_budget_exceeded"
+    RECOVERY_ENTERED = "recovery_entered"
+    RECOVERY_EXITED = "recovery_exited"
+    RECOVERY_BLOCKED_ACTION = "recovery_blocked_action"
 
 @dataclass
 class AutonomyDecision:

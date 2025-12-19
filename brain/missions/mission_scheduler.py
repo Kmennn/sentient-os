@@ -85,6 +85,7 @@ from brain.actions.action_executor import ActionSandbox
 from brain.actions.action_capability import ActionCapability, ActionRisk
 from brain.actions.action_result import ActionStatus
 from brain.autonomy.autonomy_budget_manager import AutonomyBudgetManager
+from brain.autonomy.recovery_manager import RecoveryManager
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -275,6 +276,7 @@ class MissionScheduler:
         self.last_confidence: SystemConfidence = None
         self.action_sandbox = ActionSandbox(self.autonomy_ledger, self)
         self.budget_manager = AutonomyBudgetManager(self.autonomy_ledger)
+        self.recovery_manager = RecoveryManager(self.autonomy_ledger)
         
         # ... (Services) ...
 
@@ -423,11 +425,21 @@ class MissionScheduler:
         return self.last_confidence
 
     def is_safe_to_execute(self, cap: ActionCapability) -> bool:
+        # -1. Recovery Check (v21.1)
+        if self.recovery_manager.is_action_blocked():
+             print(f"[Scheduler] Blocked {cap.action_id}: System in Recovery Mode.")
+             # Log implicitly handled or explicit block?
+             # Let's rely on Manager state, but maybe log specific block here if desired.
+             return False
+
         # 0. Budget Check (v21.0)
         # Note: We check allowance but don't increment yet (ledger counts executed events).
         if not self.budget_manager.check_allowance(self.device_trust_score):
              usage = self.budget_manager.get_usage(self.device_trust_score)
              print(f"[Scheduler] Blocked {cap.action_id}: Budget Exceeded. {usage.block_reason}")
+             
+             # Notify Recovery Manager (Budget Pressure)
+             self.recovery_manager.notify_budget_exceeded()
              
              # Log Exceeded
              decision = AutonomyDecision(
@@ -482,6 +494,7 @@ class MissionScheduler:
         elif status == ActionStatus.FAILED:
             print(f"[Scheduler] Action {action_id} Failed. -Trust")
             self.update_device_trust(-0.05) # Penalty
+            self.recovery_manager.notify_failure() # v21.1
         # Re-calc confidence implicitly on next cycle or force?
         # Maybe force summary update if critical failure.
         

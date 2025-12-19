@@ -39,6 +39,7 @@ app.include_router(timeline_router)
 app.include_router(confidence_router)
 app.include_router(actions_router)
 app.include_router(budget_router)
+app.include_router(recovery_router)
 app.include_router(memory_router)
 app.include_router(preferences_router)
 

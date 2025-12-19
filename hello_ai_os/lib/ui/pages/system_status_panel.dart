@@ -254,6 +254,20 @@ class SystemStatusPanel extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                       _ControlRow(
+                        label: "Recovery Mode",
+                        child: Tooltip(
+                          message: "System is cooling down to avoid errors",
+                          child: Text(
+                            _recoveryLevel,
+                            style: TextStyle(
+                              color: _recoveryLevel == "NONE" ? Colors.greenAccent : Colors.redAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -280,6 +294,23 @@ class SystemStatusPanel extends StatelessWidget {
       print("API Error: $e");
     }
   }
+
+  Future<void> _checkRecoveryStatus() async {
+    try {
+      final response = await http.get(Uri.parse('http://127.0.0.1:8000/autonomy/recovery'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _recoveryLevel = data['level'];
+        });
+      }
+    } catch (e) {
+      print("Error fetching recovery: $e");
+    }
+  }
+  
+  String _recoveryLevel = "NONE";
+
 
   Color _getTrustColor(double score) {
     if (score >= 0.7) return Colors.greenAccent;
