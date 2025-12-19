@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// Standalone Prototype for H3/H4 (Tray Interface)
+// Standalone Prototype for H3/H4/H5 (Tray Interface)
 class TrayPrototype extends StatefulWidget {
   const TrayPrototype({super.key});
 
@@ -13,17 +13,25 @@ class TrayPrototype extends StatefulWidget {
 class _TrayPrototypeState extends State<TrayPrototype> {
   // Mock Data (Real world would stream)
   bool _shieldActive = false;
-  // H4: Voice Status
   bool _voiceActive = false;
-  // Used for status display
   String _healthStatus = "OK";
-  List<String> _timeline = ["System Init"]; // Used
-  List<Map<String, dynamic>> _suggestions = []; // Used
+  List<String> _timeline = ["System Init"];
+  List<Map<String, dynamic>> _suggestions = [];
+
+  // H5: Command Input
+  final TextEditingController _cmdController = TextEditingController();
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _fetchState();
+  }
+
+  @override
+  void dispose() {
+    _cmdController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchState() async {
@@ -34,16 +42,58 @@ class _TrayPrototypeState extends State<TrayPrototype> {
       );
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
-        setState(() {
-          _shieldActive = data['focus_state'] == 'focus_session';
-          _healthStatus = data['recovery_state'] ?? "OK";
-          // H4: Check if voice system is nominal (mocked)
-          _voiceActive = _healthStatus == "NONE" || _healthStatus == "OK";
-        });
+        if (mounted) {
+          setState(() {
+            _shieldActive = data['focus_state'] == 'focus_session';
+            _healthStatus = data['recovery_state'] ?? "OK";
+            _voiceActive = _healthStatus == "NONE" || _healthStatus == "OK";
+          });
+        }
       }
-      // Fetch suggestions, etc.
     } catch (e) {
       print("Tray Connect Error: $e");
+    }
+  }
+
+  // H5: Submit Command
+  Future<void> _submitCommand(String text) async {
+    if (text.trim().isEmpty) return;
+    setState(() => _isSubmitting = true);
+
+    try {
+      final res = await http.post(
+        Uri.parse("http://127.0.0.1:8000/input/command"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({"text": text}),
+      );
+
+      if (res.statusCode == 200) {
+        // Success feedback
+        final data = json.decode(res.body);
+        _cmdController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['message'] ?? "Command Executed"),
+            duration: const Duration(seconds: 1),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _fetchState(); // Refresh
+      } else {
+        // Error feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: ${res.body}"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed: $e"), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -64,37 +114,35 @@ class _TrayPrototypeState extends State<TrayPrototype> {
 
   @override
   Widget build(BuildContext context) {
-    // Fixed Size for Tray Window simulation
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
         width: 300,
-        height: 500,
+        height: 550, // Slightly taller for input
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.85),
+          color: Colors.black.withOpacity(0.9), // Darker for H5
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white12),
         ),
         child: Column(
           children: [
-            // Header
             _buildHeader(),
-            const Divider(color: Colors.white10),
-
-            // Flagship: The Shield
+            const Divider(color: Colors.white10, height: 1),
             Expanded(flex: 2, child: _buildShieldControl()),
-
-            // Timeline / Suggestions
             Expanded(flex: 3, child: _buildFeed()),
 
-            // Footer
-            _buildFooter(),
+            // H5: Command Input
+            const Divider(color: Colors.white10, height: 1),
+            _buildInputArea(),
+
+            _buildStatusFooter(),
           ],
         ),
       ),
     );
   }
 
+  // ... (Header and Shield same as before)
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -116,7 +164,6 @@ class _TrayPrototypeState extends State<TrayPrototype> {
           ),
           Row(
             children: [
-              // H4: Voice Icon
               Icon(
                 _voiceActive ? Icons.volume_up : Icons.volume_off,
                 color: _voiceActive ? Colors.white38 : Colors.white10,
@@ -129,7 +176,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
                   color: Colors.white38,
                   size: 16,
                 ),
-                onPressed: () {}, // Open Settings
+                onPressed: () {},
               ),
             ],
           ),
@@ -200,35 +247,15 @@ class _TrayPrototypeState extends State<TrayPrototype> {
           ),
         ),
         const SizedBox(height: 8),
-        // Use Mock Data to clear lints
         if (_timeline.isNotEmpty)
           _buildFeedItem(Icons.history, "Context", _timeline.last, false),
-
-        if (_suggestions.isNotEmpty)
-          ..._suggestions.map(
-            (s) => _buildFeedItem(
-              Icons.auto_awesome,
-              s['title'] ?? "Suggestion",
-              s['desc'] ?? "",
-              true,
-            ),
-          ),
-
         if (_suggestions.isEmpty)
           _buildFeedItem(
             Icons.auto_awesome,
             "Suggestion",
-            "Optimize memory usage?",
+            "Optimize memory?",
             true,
           ),
-
-        const SizedBox(height: 8),
-        _buildFeedItem(
-          Icons.check_circle_outline,
-          "System",
-          "Health: $_healthStatus",
-          false,
-        ),
       ],
     );
   }
@@ -269,32 +296,65 @@ class _TrayPrototypeState extends State<TrayPrototype> {
               ],
             ),
           ),
-          if (isAction)
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 10,
-              color: Colors.white38,
+        ],
+      ),
+    );
+  }
+
+  // H5: Input Area
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: Colors.black45,
+      child: Row(
+        children: [
+          const Text(
+            ">",
+            style: TextStyle(
+              color: Colors.greenAccent,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _cmdController,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontFamily: "Consolas",
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: "Enter command (/focus, /status)...",
+                hintStyle: TextStyle(color: Colors.white24),
+                isDense: true,
+              ),
+              onSubmitted: _submitCommand,
+              enabled: !_isSubmitting,
+            ),
+          ),
+          if (_isSubmitting)
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildStatusFooter() {
     return Container(
-      padding: const EdgeInsets.all(8),
-      color: Colors.black45,
+      padding: const EdgeInsets.all(4),
+      color: Colors.black87,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.favorite, color: Colors.greenAccent, size: 10),
-          const SizedBox(width: 4),
           Text(
-            "System Healthy",
-            style: TextStyle(
-              color: Colors.greenAccent.withOpacity(0.8),
-              fontSize: 10,
-            ),
+            "System: $_healthStatus",
+            style: TextStyle(color: Colors.white38, fontSize: 9),
           ),
         ],
       ),
