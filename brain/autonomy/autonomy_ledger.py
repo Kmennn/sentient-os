@@ -85,6 +85,7 @@ class DecisionType(Enum):
     BACKPRESSURE_ENABLED = "backpressure_enabled"
     BACKPRESSURE_CLEARED = "backpressure_cleared"
     INVARIANT_VIOLATION = "invariant_violation"
+    CONTEXT_SIGNAL_RECEIVED = "context_signal_received"
 
 @dataclass
 class AutonomyDecision:

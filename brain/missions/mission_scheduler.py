@@ -182,6 +182,8 @@ class QueuedMission:
     hints: List[OptimizationHint] = field(compare=False, default_factory=list)
 
 from brain.output.voice_output_manager import VoiceOutputManager
+from brain.context.signals.app_context_provider import AppContextProvider
+from brain.context.signals.calendar_provider import CalendarProvider
 
 class MissionScheduler:
     """
@@ -211,6 +213,12 @@ class MissionScheduler:
         
         # H4: Voice Output Manager
         self.voice_manager = VoiceOutputManager(self) # access to context via self
+        
+        # H6: Context Providers (Read-Only)
+        self.app_provider = AppContextProvider()
+        self.calendar_provider = CalendarProvider()
+        self._last_app_context_data = None
+        self._last_cal_context_data = None
         
         # Event Bus
         self.event_bus = event_bus
@@ -1248,6 +1256,21 @@ class MissionScheduler:
         # v11.0 Ambient Observer
         self.ambient_observer.tick()
         
+        # H6: Context Signals (App/Calendar)
+        # We poll and log only on change to avoid noise
+        try:
+            app_sig = self.app_provider.get_context()
+            if app_sig and app_sig.data != self._last_app_context_data:
+                 self._last_app_context_data = app_sig.data
+                 self._log_autonomy_decision(DecisionType.CONTEXT_SIGNAL_RECEIVED, reason=f"App: {app_sig.data}", was_auto=False)
+                 
+            cal_sig = self.calendar_provider.check_status()
+            if cal_sig and cal_sig.data != self._last_cal_context_data:
+                 self._last_cal_context_data = cal_sig.data
+                 self._log_autonomy_decision(DecisionType.CONTEXT_SIGNAL_RECEIVED, reason=f"Calendar: {cal_sig.data.get('status')}", was_auto=False)
+        except Exception as e:
+            print(f"[CONTEXT] Provider Error: {e}")
+
         # v12.0 External Observer
         # S6: Check Backpressure
         if self._backpressure_active:
