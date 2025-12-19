@@ -37,7 +37,8 @@ class SystemState(BaseModel):
     # v13.1
     last_contextual_narration_available: bool = False
     # v14.0
-    contextual_history_available: bool = False
+    contextual_history_count: int = 0
+    last_pattern_detected: bool = False
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}

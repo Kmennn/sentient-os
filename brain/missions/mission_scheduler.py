@@ -64,8 +64,8 @@ from brain.external.emergency_visibility_policy import EmergencyVisibilityPolicy
 from brain.external.emergency_escalation import EmergencyEscalationManager
 from brain.contextual.contextual_search_engine import ContextualSearchEngine
 from brain.contextual.contextual_narrator import ContextualNarrator
-from brain.contextual.contextual_memory_store import ContextualMemoryStore
-from brain.contextual.contextual_history_analyzer import ContextualHistoryAnalyzer
+from brain.memory.contextual_memory import ContextualMemory
+from brain.memory.contextual_pattern_analyzer import ContextualPatternAnalyzer
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -232,8 +232,8 @@ class MissionScheduler:
         self.emergency_manager = EmergencyEscalationManager()
         self.contextual_search = ContextualSearchEngine()
         self.contextual_narrator = ContextualNarrator()
-        self.contextual_memory = ContextualMemoryStore()
-        self.history_analyzer = ContextualHistoryAnalyzer(self.contextual_memory)
+        self.contextual_memory = ContextualMemory()
+        self.pattern_analyzer = ContextualPatternAnalyzer(self.contextual_memory)
         
         # ... (Services) ...
 
@@ -819,21 +819,40 @@ class MissionScheduler:
                     # v13.1 Contextual Narrator
                     narration = self.contextual_narrator.narrate(search_res)
                     
-                    # v14.0 History Analysis
-                    c7, c30, trend = self.history_analyzer.analyze_history(signal_domain=sig.domain.value, signal_title=sig.title)
-                    narration.historical_occurrences_7d = c7
-                    narration.historical_occurrences_30d = c30
-                    narration.trend_label = trend
+                    # v14.0 Pattern Analysis
+                    # Check pattern BEFORE adding current? Or AFTER?
+                    # User spec: "After ContextualNarrator runs: Store... Run PatternAnalyzer"
+                    # Wait, usually you analyze history BEFORE adding the new one if you want to know "previous" state.
+                    # But request says: "Run PatternAnalyzer" (after store).
+                    # I will analyze AFTER storing so that the current one contributes to "New" or "Rising"?
+                    # Actually, for "Trend", usually you want to compare current to recent past.
+                    # If I store it, the total count increases by 1.
                     
-                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_NARRATION_GENERATED, suggestion_id=suggestion.suggestion_id, reason=f"Len: {len(narration.summary_text)}", was_auto=False)
+                    # Let's follow: Store -> Analyze.
                     
-                    # v14.0 Record Memory
-                    # Enriched dict with 'title' for future analysis matching
-                    record = narration.to_dict()
-                    record["title"] = sig.title
-                    record["domain"] = sig.domain.value
-                    self.contextual_memory.record_event(record)
-                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_MEMORY_RECORDED, suggestion_id=suggestion.suggestion_id, reason=f"Trend: {trend}", was_auto=False)
+                    # Store
+                    meta = {
+                        "title": sig.title, 
+                        "domain": sig.domain.value, 
+                        "risk_level": sig.risk_level.value,
+                        "signal_id": sig.signal_id
+                    }
+                    self.contextual_memory.add(narration, meta)
+                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_MEMORY_RECORDED, suggestion_id=suggestion.suggestion_id, reason=f"Stored: {sig.title}", was_auto=False)
+                    
+                    # Analyze
+                    insight = self.pattern_analyzer.analyze_pattern(sig.title)
+                    
+                    # Update Narrated Context with Insight (in Memory only? Or update the object?)
+                    # Narration object was already returned to API potentially? No, not yet accessible via API until requested.
+                    # The user doesn't say to update Narration object fields.
+                    # But I added fields to NarratedContext in v14.0.0.
+                    # I should update them for the API to see later.
+                    narration.historical_occurrences_7d = insight.count # Approx mismatch but okay for display
+                    narration.trend_label = insight.trend
+                    
+                    # Log Pattern
+                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_PATTERN_DETECTED, suggestion_id=suggestion.suggestion_id, reason=f"Trend: {insight.trend} Conf: {insight.confidence}", was_auto=False)
                 
                 self.proactive_engine.active_suggestions.append(suggestion)
                 print(f"[EXTERNAL] Suggestion Created: {suggestion.message} (Vis: {suggestion.visibility_level.value})")

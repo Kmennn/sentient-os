@@ -153,7 +153,8 @@ def get_current_state() -> SystemState:
         # v13.1
         last_contextual_narration_available=len(mission_scheduler.contextual_narrator._narrations) > 0,
         # v14.0
-        contextual_history_available=len(mission_scheduler.contextual_memory.get_history()) > 0
+        contextual_history_count=len(mission_scheduler.contextual_memory._history),
+        last_pattern_detected=len(mission_scheduler.contextual_memory._history) > 3 # Proxy for "enough data"
     )
 
 @app.post("/interrupts/{request_id}/respond")
