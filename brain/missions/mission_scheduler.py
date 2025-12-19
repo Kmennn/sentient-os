@@ -58,6 +58,11 @@ class BrainPhase(Enum):
     EXECUTE = "execute"
     RECORD = "record"
 
+# S6: Tick Budget Constants
+MAX_TICK_DURATION_MS = 100
+SLOW_TICK_THRESHOLD_MS = 50
+
+
 class MissionPriority(IntEnum):
     BACKGROUND = 1
     SYSTEM = 5
@@ -193,6 +198,10 @@ class MissionScheduler:
         
         # S5: Tick Context (Idempotency)
         self._tick_context: Optional[TickContext] = None
+        
+        # S6: Tick Budget State
+        self._last_tick_duration_ms: float = 0.0
+        self._backpressure_active: bool = False
         
         # Event Bus
         self.event_bus = event_bus
@@ -1085,6 +1094,9 @@ class MissionScheduler:
     # No feature flags, experimental branches, or conditional behavior
     # are allowed in tick() during stabilization.
     def tick(self, override_now: float = None) -> Optional[str]:
+        # S6: Measure Tick Duration
+        tick_start = time.monotonic()
+        
         # S5: Create Tick Context (Deterministic Scope)
         import uuid
         self._tick_context = TickContext(tick_id=str(uuid.uuid4()))
@@ -1107,6 +1119,42 @@ class MissionScheduler:
         self._run_record_phase()
         
         self._current_phase = None
+        
+        # S6: Slow-Tick Detection & Backpressure
+        elapsed_ms = (time.monotonic() - tick_start) * 1000
+        self._last_tick_duration_ms = elapsed_ms
+        
+        if elapsed_ms >= SLOW_TICK_THRESHOLD_MS:
+            # Check if we need to log
+            # We use a temp context if needed or assume we can append to ledger?
+            # Wait, record phase is over. _run_record_phase flushes.
+            # If we log here, it won't be flushed until NEXT tick if we append to pending.
+            # OR we append directly to ledger if _tick_context is still alive (it is).
+            # But we must be careful about phase assertions if we strictly enforced them.
+            # Ideally we log in current context.
+            
+            # Re-enter RECORD phase momentarily? Or just append since we are "system"?
+            # Prompt says "Log a ledger event... Update a scheduler field".
+            # Let's append directly to ledger (bypassing phase check or re-entering).
+            # But `_log_autonomy_decision` appends to `_pending_ledger_entries`.
+            # And `_run_record_phase` flushes them.
+            # So if we log now, it sits in pending until NEXT tick's record phase.
+            # That is acceptable and robust.
+            
+            self._log_autonomy_decision(DecisionType.SLOW_TICK_DETECTED, reason=f"Duration: {elapsed_ms:.2f}ms", was_auto=False)
+            
+            # Backpressure Logic
+            if elapsed_ms >= MAX_TICK_DURATION_MS:
+                if not self._backpressure_active:
+                    self._backpressure_active = True
+                    self._log_autonomy_decision(DecisionType.BACKPRESSURE_ENABLED, reason=f"Tick exceeded {MAX_TICK_DURATION_MS}ms", was_auto=False)
+        else:
+            # Clear backpressure if fast
+            if self._backpressure_active:
+                self._backpressure_active = False
+                self._log_autonomy_decision(DecisionType.BACKPRESSURE_CLEARED, reason=f"Tick recovered: {elapsed_ms:.2f}ms", was_auto=False)
+
+        
         self._tick_context = None # Clear Scope
         return self._cycle_decision_outcome if hasattr(self, '_cycle_decision_outcome') else None
 
@@ -1121,7 +1169,12 @@ class MissionScheduler:
         self.ambient_observer.tick()
         
         # v12.0 External Observer
-        self._cycle_signals = self.external_observer.tick()
+        # S6: Check Backpressure
+        if self._backpressure_active:
+             # Skip expensive external signal processing
+             self._cycle_signals = []
+        else:
+             self._cycle_signals = self.external_observer.tick()
 
     # PHASE GUARANTEE:
     # This method must not call later phases.
@@ -1138,7 +1191,11 @@ class MissionScheduler:
             
         # v11.1 Proactive Insights
         # Feed insights to engine
-        self._cycle_proactive_suggestions = self.proactive_engine.process_insights(self.ambient_observer.insights)
+        # S6: Check Backpressure
+        if self._backpressure_active:
+             self._cycle_proactive_suggestions = []
+        else:
+             self._cycle_proactive_suggestions = self.proactive_engine.process_insights(self.ambient_observer.insights)
 
     # PHASE GUARANTEE:
     # This method must not call later phases.
