@@ -52,6 +52,9 @@ class SystemState(BaseModel):
     reflection_confidence: float = 0.0
     # v16.1
     pending_adjustments_count: int = 0
+    # v17.0
+    last_active_agent: str = "system"
+    agent_phase: str = "idle"
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}

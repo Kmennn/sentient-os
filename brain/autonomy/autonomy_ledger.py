@@ -36,6 +36,8 @@ class DecisionType(Enum):
     ADJUSTMENT_PROPOSED = "adjustment_proposed"
     ADJUSTMENT_APPROVED = "adjustment_approved"
     ADJUSTMENT_REJECTED = "adjustment_rejected"
+    AGENT_DECISION = "agent_decision"
+    AGENT_BOUNDARY_VIOLATION = "agent_boundary_violation"
 
 @dataclass
 class AutonomyDecision:

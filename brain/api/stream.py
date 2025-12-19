@@ -180,7 +180,10 @@ def get_current_state() -> SystemState:
         last_reflection_signal=mission_scheduler.reflection_engine.last_reflection_signal,
         reflection_confidence=mission_scheduler.reflection_engine.reflection_confidence,
         # v16.1
-        pending_adjustments_count=len([p for p in mission_scheduler.adjustment_engine.active_proposals.values() if p.status.value == "pending"])
+        pending_adjustments_count=len([p for p in mission_scheduler.adjustment_engine.active_proposals.values() if p.status.value == "pending"]),
+        # v17.0
+        last_active_agent=mission_scheduler.current_agent_phase, # Simplified mapping
+        agent_phase=mission_scheduler.current_agent_phase
     )
 
 @app.post("/interrupts/{request_id}/respond")

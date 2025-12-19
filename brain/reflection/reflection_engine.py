@@ -5,6 +5,8 @@ import uuid
 from brain.reflection.reflection_event import ReflectionEvent, ReflectionEventType
 from brain.autonomy.autonomy_ledger import AutonomyLedger, DecisionType, AutonomyDecision
 
+from brain.agents.agent_context import AgentContext, AgentAction
+
 class ReflectionEngine:
     def __init__(self, ledger: AutonomyLedger):
         self.ledger = ledger
@@ -13,9 +15,24 @@ class ReflectionEngine:
         self.last_reflection_signal: Optional[str] = None
         self.reflection_confidence: float = 0.0
         
-    def process_event(self, event: ReflectionEvent):
+    def process_event(self, event: ReflectionEvent, context: AgentContext = None):
+        # v17.0 Boundary Check
+        if context and not context.can_perform(AgentAction.REFLECTION_GENERATE):
+            self._log_violation(context, "Cannot generate reflection")
+            return
+
         self.event_buffer.append(event)
         self._analyze(event)
+        
+    def _log_violation(self, context: AgentContext, msg: str):
+        decision = AutonomyDecision(
+            decision_id=str(uuid.uuid4()),
+            decision_type=DecisionType.AGENT_BOUNDARY_VIOLATION,
+            timestamp=time.time(),
+            reason=f"[{context.role.value.upper()}] Violation: {msg}",
+            was_auto=True
+        )
+        self.ledger.append(decision)
         
     def _analyze(self, trigger_event: ReflectionEvent):
         # Time Windows

@@ -4,7 +4,10 @@ from brain.reflection.reflection_event import ReflectionEvent, ReflectionEventTy
 from brain.reflection.adjustment_proposal import AdjustmentProposal, ProposalStatus
 from brain.preferences.preference_store import PreferenceStore, ImportanceLevel, ExplicitPreference
 from brain.autonomy.autonomy_ledger import AutonomyLedger, DecisionType, AutonomyDecision
+from brain.agents.agent_context import AgentContext, AgentAction
 import uuid
+import time
+
 
 class AdjustmentEngine:
     def __init__(self, preference_store: PreferenceStore, ledger: AutonomyLedger):
@@ -13,100 +16,22 @@ class AdjustmentEngine:
         self.active_proposals: Dict[str, AdjustmentProposal] = {} # id -> proposal
         self.last_check_timestamp: float = 0.0
         
-        # Mapping for Importance Progression
+        # ... (Mappings)
         self.importance_order = [
             ImportanceLevel.LOW,
             ImportanceLevel.MEDIUM,
             ImportanceLevel.HIGH,
             ImportanceLevel.CRITICAL
         ]
-
-    def _get_next_higher(self, level: ImportanceLevel) -> Optional[ImportanceLevel]:
-        try:
-            idx = self.importance_order.index(level)
-            if idx < len(self.importance_order) - 1:
-                return self.importance_order[idx + 1]
-        except ValueError:
-            pass
-        return None
-
-    def _get_next_lower(self, level: ImportanceLevel) -> Optional[ImportanceLevel]:
-        try:
-            idx = self.importance_order.index(level)
-            if idx > 0:
-                return self.importance_order[idx - 1]
-        except ValueError:
-            pass
-        return None
-
-    def evaluate_adjustments(self, reflections: List[AutonomyDecision]):
-        """
-        Scans recent reflections (from Ledger decisions) to find patterns.
-        """
-        # Group Negatives by Domain
-        # We look at AutonomyDecisions where decision_type is REFLECTION_NEGATIVE
-        # And timestamp > something? Or just all relevant ones not yet acted upon?
-        # For simplicity v1: Look back at last N reflections or based on time.
-        # Ideally we track which reflections contributed to a proposal so we don't reuse them.
         
-        # Simple heuristic: Count negatives in the last batch passed in.
-        domain_negatives: Dict[str, List[AutonomyDecision]] = {}
-        
-        for r in reflections:
-            if r.decision_type == DecisionType.REFLECTION_NEGATIVE:
-                # Extract domain from reason? Or we need domain to be stored better.
-                # ReflectionEngine logs: f"[{TYPE}] {domain}: {reason}" in insights.
-                # Ledger entries have `reason` field: "Over-filtered? User searched for 'SYSTEM'..."
-                # Extracting domain from text is brittle.
-                # Note: `ReflectionEngine` logged decision. But `AutonomyDecision` struct doesn't have `domain` field explicitly.
-                # It has `reason`.
-                # Wait, `ReflectionEvent` has `domain`.
-                # But `AdjustmentEngine` consumes `AutonomyDecision` from Ledger? Or `ReflectionEvent` from buffer?
-                # The prompt says "Turn Reflection data into...".
-                # Providing `ReflectionEvent` buffer is better since it has structured domain.
-                pass
-        pass
-        
-    def evaluate_reflection_events(self, events: List[ReflectionEvent]):
-        """
-        Evaluates structured reflection events.
-        """
-        # 1. Group by Domain
-        negatives_by_domain: Dict[str, List[ReflectionEvent]] = {}
-        
-        for e in events:
-            # We assume events passed are from the buffer (so recent)
-            # We need to map EventType to meaning.
-            # But the "Negative" judgment came from ReflectionEngine logic (Rule 1 & 2).
-            # ReflectionEvents are inputs processing.
-            # `ReflectionEngine` generates Insights (strings) and Ledger Entries.
-            # It DOES NOT emit a "Processed Reflection Event" structure back.
-            # It just logs to Ledger.
-            
-            # Re-evaluating: `AdjustmentEngine` should perhaps process the *output* of `ReflectionEngine`.
-            # Ledger decisions `REFLECTION_NEGATIVE` are the output.
-            # Issue: Ledger decision lacks `domain` field.
-            # I should add `domain` to `AutonomyDecision`? Or parse `reason`.
-            # Parsing `reason` is okay for now if format is consistent.
-            # "Over-filtered? User searched for '{domain}'..."
-            # "Over-noise? User dismissed '{domain}'..."
-            pass
-            
-            # Alternative: `ReflectionEngine` can expose a structured history or pass data to AdjustmentEngine.
-            # Or `ReflectionEngine` can call `AdjustmentEngine` directly when it detects negative.
-            # But "MissionScheduler: Runs AdjustmentEngine on tick".
-            # So it's polling.
-            
-            # Let's parse Ledger decisions for now, or just look at `ReflectionEngine`'s buffer if we can infer "Negative".
-            # `ReflectionEngine` determines Negative. Re-implementing logic here is bad.
-            # I will Parse Ledger Decisions.
-            
-            # Better: Update `AutonomyDecision` to include `metadata` dict?
-            # It has `action_id`? `suggestion_id`? 
-            # It has `reason`.
-            pass
+    # ... (Helpers)
 
-    def scan_ledger_for_proposals(self, decisions: List[AutonomyDecision]):
+    def scan_ledger_for_proposals(self, decisions: List[AutonomyDecision], context: AgentContext = None):
+        # v17.0 Boundary Check
+        if context and not context.can_perform(AgentAction.PROPOSAL_CREATE):
+            self._log_violation(context, "Cannot create proposals")
+            return
+            
         domain_issues: Dict[str, List[str]] = {} # domain -> list of reasons
         
         for d in decisions:
@@ -217,3 +142,13 @@ class AdjustmentEngine:
                     was_auto=False
                 )
                 self.ledger.append(decision)
+
+    def _log_violation(self, context: AgentContext, msg: str):
+        decision = AutonomyDecision(
+            decision_id=str(uuid.uuid4()),
+            decision_type=DecisionType.AGENT_BOUNDARY_VIOLATION,
+            timestamp=time.time(),
+            reason=f"[{context.role.value.upper()}] Violation: {msg}",
+            was_auto=True
+        )
+        self.ledger.append(decision)

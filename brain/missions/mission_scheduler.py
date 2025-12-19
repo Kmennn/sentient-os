@@ -74,6 +74,7 @@ from brain.alerts.alert_importance import AlertImportanceResolver
 from brain.reflection.reflection_event import ReflectionEvent, ReflectionEventType
 from brain.reflection.reflection_engine import ReflectionEngine
 from brain.reflection.adjustment_engine import AdjustmentEngine
+from brain.agents.agent_context import AgentContext, AgentRole, OBSERVER_CONTEXT, ANALYST_CONTEXT, GOVERNOR_CONTEXT
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -249,6 +250,9 @@ class MissionScheduler:
         self.reflection_engine = ReflectionEngine(self.autonomy_ledger)
         self.adjustment_engine = AdjustmentEngine(self.preference_store, self.autonomy_ledger)
         self.last_adjustment_check = 0.0
+        
+        # v17.0
+        self.current_agent_phase = AgentRole.SYSTEM.value
         
         # ... (Services) ...
 
@@ -475,9 +479,11 @@ class MissionScheduler:
         # v16.1 Periodically run Adjustment Engine (every 60s)
         if time.time() - self.last_adjustment_check > 60:
             self.last_adjustment_check = time.time()
+            self.current_agent_phase = AgentRole.GOVERNOR.value # Phase Switch
             # Scan recent ledger entries (last 100)
             entries = self.autonomy_ledger.get_entries()[-100:]
-            self.adjustment_engine.scan_ledger_for_proposals(entries)
+            self.adjustment_engine.scan_ledger_for_proposals(entries, context=GOVERNOR_CONTEXT)
+            self.current_agent_phase = AgentRole.SYSTEM.value # Reset
         
         for s in candidates:
             # v15.1 Filtering Logic
@@ -519,7 +525,7 @@ class MissionScheduler:
                          event_type=ReflectionEventType.ALERT_FILTERED,
                          domain=domain,
                          item_id=s.suggestion_id
-                     ))
+                     ), context=ANALYST_CONTEXT)
             else:
                  # It should show
                  if s.is_filtered:
@@ -532,7 +538,7 @@ class MissionScheduler:
                          event_type=ReflectionEventType.ALERT_SHOWN,
                          domain=domain,
                          item_id=s.suggestion_id
-                     ))
+                     ), context=ANALYST_CONTEXT)
             
             # Final output list construction (Existing logic + Filter check)
             # Only add if NOT filtered OR force visible?
@@ -587,7 +593,7 @@ class MissionScheduler:
                  event_type=ReflectionEventType.ALERT_DISMISSED,
                  domain=domain,
                  item_id=suggestion_id
-             ))
+             ), context=ANALYST_CONTEXT)
         
             self.proactive_engine.dismiss(suggestion_id)
             print(f"Suggestion {suggestion_id} DISMISSED")
@@ -606,10 +612,10 @@ class MissionScheduler:
             # v16.0 Reflection Hook
             domain = sg.metadata.get("domain", "unknown")
             self.reflection_engine.process_event(ReflectionEvent(
-                 event_type=ReflectionEventType.ALERT_ACKED,
-                 domain=domain,
-                 item_id=suggestion_id
-            ))
+                event_type=ReflectionEventType.USER_MANUAL_SEARCH,
+                domain=domain,
+                metadata={"query": query}
+            ), context=ANALYST_CONTEXT)
              
             self.proactive_engine.accept(suggestion_id)
             print(f"Suggestion {suggestion_id} ACCEPTED")
