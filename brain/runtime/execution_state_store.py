@@ -37,10 +37,27 @@ class ExecutionStateStore:
                 # Convert string phase to Enum
                 if "action_phase" in data:
                     data["action_phase"] = ActionPhase(data["action_phase"])
-                return ExecutionState(**data)
+                
+                state = ExecutionState(**data)
+                
+                # S4: Crash Safety Guard
+                # If we crashed while executing, we MUST NOT auto-resume.
+                if state.action_phase == ActionPhase.EXECUTING:
+                    import time
+                    state.action_phase = ActionPhase.INTERRUPTED
+                    state.error = "System restart detected during execution"
+                    state.interrupted_at = time.time()
+                    self._save_on_load(state)
+                    
+                return state
         except Exception as e:
             print(f"[ExecutionStore] Corrupt state file: {e}")
             return ExecutionState()
+
+    def _save_on_load(self, state):
+        # Helper to strict save modified state during load
+        self.state = state
+        self._save()
 
     def update_state(self, state: ExecutionState):
         with self._lock:

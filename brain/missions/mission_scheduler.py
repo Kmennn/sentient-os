@@ -181,6 +181,9 @@ class MissionScheduler:
         self._pending_ledger_entries: List[AutonomyDecision] = []
         self._cycle_auto_actions: List[Any] = []
         
+        # S4: Crash Safety
+        self._startup_blocked: bool = False
+        
         # Event Bus
         self.event_bus = event_bus
         
@@ -1248,12 +1251,36 @@ class MissionScheduler:
             self._cycle_decision_outcome = "PREEMPT"
             return
 
+
+    def _check_startup_recovery(self):
+        # S4: Check for Crash Interruption
+        state = self.execution_store.get_state()
+        if state.action_phase == ActionPhase.INTERRUPTED:
+            self._startup_blocked = True
+            logger.critical(f"STARTUP BLOCKED: Previous execution interrupted at {state.interrupted_at}. User intervention required.")
+
+    def clear_startup_block(self):
+        """
+        Manually clears the startup block.
+        Only called by explicit user action (Retry/Abort).
+        """
+        if self._startup_blocked:
+            logger.info("Manual intervention received. Clearing startup block.")
+            self._startup_blocked = False
+
     # PHASE GUARANTEE:
     # This method must not call later phases.
     # No cross-phase side effects allowed.
     def _run_execute_phase(self):
         """Sandboxed execution only"""
         self._enter_phase(BrainPhase.EXECUTE)
+        
+        # S4: Execution Guard
+        if self._startup_blocked:
+             raise RuntimeError(
+                "Execution blocked: previous action was interrupted. "
+                "User must explicitly Retry or Abort."
+            )
         
         # 1. Mission Lifecycle Execution
         if self._cycle_decision:
