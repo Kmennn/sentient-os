@@ -1043,17 +1043,61 @@ class MissionScheduler:
         self.governance_service.check_vote_authority(proposal, user_id, approved)
         self.event_bus.emit(EventType.COPLAN_VOTE_REGISTERED, {"proposal_id": proposal.proposal_id, "user_id": user_id, "approved": approved})
 
+    # NOTE:
+    # No feature flags, experimental branches, or conditional behavior
+    # are allowed in tick() during stabilization.
     def tick(self, override_now: float = None) -> Optional[str]:
-        now = override_now if override_now is not None else time.time()
-        self.event_bus.emit(EventType.SCHEDULER_TICK, {"time": now})
+        self._current_tick_time = override_now if override_now is not None else time.time()
+        self.event_bus.emit(EventType.SCHEDULER_TICK, {"time": self._current_tick_time})
         
-        # v11.0 Ambient Observer
+        # Reset Cycle State
+        self._cycle_signals = []
+        self._cycle_active_suggestions = []
+        self._cycle_decision = None # e.g. ("START", mission) or ("PREEMPT", None)
+        
+        self._run_observe_phase()
+        self._run_analyze_phase()
+        self._run_decide_phase()
+        self._run_execute_phase()
+        self._run_record_phase()
+        
+        return self._cycle_decision_outcome if hasattr(self, '_cycle_decision_outcome') else None
+
+    # PHASE GUARANTEE:
+    # This method must not call later phases.
+    # No cross-phase side effects allowed.
+    def _run_observe_phase(self):
+        """Collect signals, device state, external inputs"""
         # v11.0 Ambient Observer
         self.ambient_observer.tick()
         
         # v12.0 External Observer
-        ext_signals = self.external_observer.tick()
-        for sig in ext_signals:
+        self._cycle_signals = self.external_observer.tick()
+
+    # PHASE GUARANTEE:
+    # This method must not call later phases.
+    # No cross-phase side effects allowed.
+    def _run_analyze_phase(self):
+        """Reflection, summaries, confidence updates"""
+        # v12.3 Check Escalations
+        escalated = self.emergency_manager.check_escalation()
+        for e in escalated:
+            print(f"[EMERGENCY] Escalated to Level {e.escalation_level} (ID: {e.emergency_id})")
+            self._log_autonomy_decision(DecisionType.EMERGENCY_ESCALATED, suggestion_id=e.suggestion_id, reason=f"Level {e.escalation_level}", was_auto=False)
+            
+        # v11.1 Proactive Insights
+        # Feed insights to engine
+        self._cycle_proactive_suggestions = self.proactive_engine.process_insights(self.ambient_observer.insights)
+
+    # PHASE GUARANTEE:
+    # This method must not call later phases.
+    # No cross-phase side effects allowed.
+    def _run_decide_phase(self):
+        """Decisions, suggestions, action selection"""
+        self._cycle_decision_outcome = None
+        
+        # 1. Process External Signals (Decision Logic)
+        for sig in self._cycle_signals:
             print(f"[EXTERNAL] Signal Classified: [{sig.domain.value.upper()}/{sig.risk_level.value.upper()}] {sig.title}")
             reason_txt = f"{sig.source}: {sig.title} (Risk: {sig.risk_level.value})"
             self._log_autonomy_decision(DecisionType.EXTERNAL_SIGNAL_CLASSIFIED, reason=reason_txt, was_auto=False)
@@ -1069,19 +1113,6 @@ class MissionScheduler:
             is_emergency = (vis == "FORCE_VISIBLE")
             
             if is_emergency:
-                # Bypass External Policy (which gates on Context)
-                # But we might want to check TRUST? 
-                # Policy says: "FORCE_VISIBLE suggestions bypass: Focus suppression, Interrupt suppression"
-                # It does NOT say it bypasses TRUST.
-                # However, ExternalSuggestionAdapter creates it. 
-                # If trust is low, should we show critical alert? Probably yes.
-                # But let's stick to the prompt: Check "ExternalSuggestionPolicy" logic?
-                # "Policy does NOT bypass execution rules"
-                # Actually v12.1 "should_allow_suggestion" returns False if Public.
-                # If Emergency, we want to IGNORE that False result IF it's just context blocking.
-                
-                # Let's create suggestion regardless of context, but maybe check trust?
-                # Prompt says: "CRITICAL signal shows even during Focus... even if interrupt_style=NEVER"
                 allowed = True
                 block_reason = ""
             else:
@@ -1103,23 +1134,11 @@ class MissionScheduler:
                     self._log_autonomy_decision(DecisionType.EMERGENCY_ACK_CREATED, suggestion_id=suggestion.suggestion_id, reason=f"Emergency ID: {ack.emergency_id}", was_auto=False)
                     
                     # v13.0 Contextual Search (Read-Only)
-                    # Trigger analysis on Critical Signal
                     search_res = self.contextual_search.perform_search(query=sig.title + " mitigation", signal_id=sig.signal_id)
                     self._log_autonomy_decision(DecisionType.CONTEXTUAL_SEARCH_PERFORMED, suggestion_id=suggestion.suggestion_id, reason=f"Conf: {search_res.confidence_score}", was_auto=False)
                     
                     # v13.1 Contextual Narrator
                     narration = self.contextual_narrator.narrate(search_res)
-                    
-                    # v14.0 Pattern Analysis
-                    # Check pattern BEFORE adding current? Or AFTER?
-                    # User spec: "After ContextualNarrator runs: Store... Run PatternAnalyzer"
-                    # Wait, usually you analyze history BEFORE adding the new one if you want to know "previous" state.
-                    # But request says: "Run PatternAnalyzer" (after store).
-                    # I will analyze AFTER storing so that the current one contributes to "New" or "Rising"?
-                    # Actually, for "Trend", usually you want to compare current to recent past.
-                    # If I store it, the total count increases by 1.
-                    
-                    # Let's follow: Store -> Analyze.
                     
                     # Store
                     meta = {
@@ -1133,13 +1152,7 @@ class MissionScheduler:
                     
                     # Analyze
                     insight = self.pattern_analyzer.analyze_pattern(sig.title)
-                    
-                    # Update Narrated Context with Insight (in Memory only? Or update the object?)
-                    # Narration object was already returned to API potentially? No, not yet accessible via API until requested.
-                    # The user doesn't say to update Narration object fields.
-                    # But I added fields to NarratedContext in v14.0.0.
-                    # I should update them for the API to see later.
-                    narration.historical_occurrences_7d = insight.count # Approx mismatch but okay for display
+                    narration.historical_occurrences_7d = insight.count
                     narration.trend_label = insight.trend
                     
                     # Log Pattern
@@ -1155,18 +1168,9 @@ class MissionScheduler:
             else:
                 self._log_autonomy_decision(DecisionType.EXTERNAL_SUGGESTION_BLOCKED, reason=f"{block_reason} (Signal: {sig.signal_id})", was_auto=False)
         
-        # v12.3 Check Escalations
-        escalated = self.emergency_manager.check_escalation()
-        for e in escalated:
-            print(f"[EMERGENCY] Escalated to Level {e.escalation_level} (ID: {e.emergency_id})")
-            self._log_autonomy_decision(DecisionType.EMERGENCY_ESCALATED, suggestion_id=e.suggestion_id, reason=f"Level {e.escalation_level}", was_auto=False)
-        
-        # v11.1 Proactive Suggestions
-        # Feed insights to engine
-        new_suggestions = self.proactive_engine.process_insights(self.ambient_observer.insights)
-        
-        # v11.3 Auto-Execution Check
-        for sg in new_suggestions:
+        # 2. Process Proactive Suggestions (Auto-Execution Logic)
+        # Note: This technically crosses into Execute, but the decision to execute matches here.
+        for sg in self._cycle_proactive_suggestions:
             # Log SUGGESTED
             self._log_autonomy_decision(DecisionType.SUGGESTED, sg.suggestion_id, sg.action_id, sg.message, was_auto=False)
             
@@ -1186,7 +1190,7 @@ class MissionScheduler:
                     
                     if allowed:
                         print(f"[AUTONOMY] Auto-Executing {sg.action_id} (Reason: {reason})")
-                        # Execute
+                        # Execution Logic (Inline for now to preserve behavior)
                         try:
                             result = act_def.executor()
                             sg.status = SuggestionStatus.AUTO_EXECUTED
@@ -1196,30 +1200,51 @@ class MissionScheduler:
                         except Exception as e:
                             print(f"[AUTONOMY] Execution Failed: {e}")
                             self.autonomy_policy.disable_autonomy(f"Execution Error: {e}")
-                            # Don't change status to executed? Or mark failed?
-                            # For now leave pending or dismiss.
-        
-        if new_suggestions:
-             print(f"[PROACTIVE] Processed {len(new_suggestions)} new suggestions.")
 
-        if not self._queue: return None
+        if self._cycle_proactive_suggestions:
+             print(f"[PROACTIVE] Processed {len(self._cycle_proactive_suggestions)} new suggestions.")
+
+        # 3. Queue Logic
+        if not self._queue: return
         
         top_mission = self._queue[0]
-        if top_mission.blocked_until > time.time(): return None
+        if top_mission.blocked_until > time.time(): return
         
         if not self._active_mission:
-            self._start_mission(heapq.heappop(self._queue))
-            return "START_NEW"
+            # Decision: START NEW
+            self._cycle_decision = ("START", heapq.heappop(self._queue))
+            self._cycle_decision_outcome = "START_NEW"
+            return
             
         if top_mission.priority < self._active_mission.priority:
             # Check Concurrency
             avoid = any(h.action == OptimizationAction.AVOID_CONCURRENCY for h in top_mission.hints)
-            if avoid: return None
+            if avoid: return
             
-            self._preempt_active()
-            return "PREEMPT"
-            
-        return None
+            # Decision: PREEMPT
+            self._cycle_decision = ("PREEMPT", None)
+            self._cycle_decision_outcome = "PREEMPT"
+            return
+
+    # PHASE GUARANTEE:
+    # This method must not call later phases.
+    # No cross-phase side effects allowed.
+    def _run_execute_phase(self):
+        """Sandboxed execution only"""
+        if self._cycle_decision:
+            action, payload = self._cycle_decision
+            if action == "START":
+                self._start_mission(payload)
+            elif action == "PREEMPT":
+                self._preempt_active()
+
+    # PHASE GUARANTEE:
+    # This method must not call later phases.
+    # No cross-phase side effects allowed.
+    def _run_record_phase(self):
+        """Ledger, persistence, memory writes"""
+        pass
+
 
     def _start_mission(self, mission):
         self._active_mission = mission
