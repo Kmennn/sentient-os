@@ -54,5 +54,19 @@
     "interrupt_style": "unknown",
     "device_id": "unknown",
     "was_auto": true
+  },
+  {
+    "decision_id": "6c8a9027-54cd-41b2-8c64-6ad669418fb2",
+    "decision_type": "sync_conflict_resolved",
+    "timestamp": 1766138229.468529,
+    "suggestion_id": null,
+    "action_id": null,
+    "reason": "Resolved 3 conflicts",
+    "trust_score": 0.0,
+    "focus_state": "unknown",
+    "presence_state": "unknown",
+    "interrupt_style": "unknown",
+    "device_id": "unknown",
+    "was_auto": true
   }
 ]

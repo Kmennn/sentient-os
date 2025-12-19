@@ -41,6 +41,9 @@ class DecisionType(Enum):
     SYNC_STATE_EXPORTED = "sync_state_exported"
     SYNC_STATE_IMPORT_ATTEMPT = "sync_state_import_attempt"
     SYNC_STATE_REJECTED = "sync_state_rejected"
+    SYNC_CONFLICT_DETECTED = "sync_conflict_detected"
+    SYNC_CONFLICT_RESOLVED = "sync_conflict_resolved"
+    SYNC_CONFLICT_REJECTED = "sync_conflict_rejected"
 
 @dataclass
 class AutonomyDecision:

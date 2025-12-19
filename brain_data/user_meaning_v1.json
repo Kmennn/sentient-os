@@ -4,5 +4,11 @@
     "relevance_score": 0.95,
     "interaction_count": 0,
     "last_interaction_ts": 0
+  },
+  "DOMAIN_C": {
+    "signal_domain": "DOMAIN_C",
+    "relevance_score": 0.5,
+    "interaction_count": 0,
+    "last_interaction_ts": 0
   }
 }

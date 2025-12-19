@@ -77,6 +77,7 @@ from brain.reflection.adjustment_engine import AdjustmentEngine
 from brain.agents.agent_context import AgentContext, AgentRole, OBSERVER_CONTEXT, ANALYST_CONTEXT, GOVERNOR_CONTEXT
 from brain.sync.state_exporter import StateExporter
 from brain.sync.state_importer import StateImporter
+from brain.sync.conflict_resolver import ConflictResolver
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -258,7 +259,8 @@ class MissionScheduler:
         
         # v18.0
         self.state_exporter = StateExporter(self.preference_store, self.meaning_memory, self.autonomy_ledger, self)
-        self.state_importer = StateImporter(self.preference_store, self.meaning_memory, self.autonomy_ledger)
+        self.conflict_resolver = ConflictResolver(self.preference_store, self.meaning_memory)
+        self.state_importer = StateImporter(self.preference_store, self.meaning_memory, self.autonomy_ledger, self.conflict_resolver)
         self.latest_sync_state = None
         
         # ... (Services) ...

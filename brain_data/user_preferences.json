@@ -18,6 +18,18 @@
       "importance_level": "high",
       "source": "USER",
       "updated_at": 1766137895.100773
+    },
+    "DOMAIN_A": {
+      "domain": "DOMAIN_A",
+      "importance_level": "high",
+      "source": "USER",
+      "updated_at": 1766138329.4640205
+    },
+    "DOMAIN_B": {
+      "domain": "DOMAIN_B",
+      "importance_level": "high",
+      "source": "USER",
+      "updated_at": 1766138229.467018
     }
   }
 }

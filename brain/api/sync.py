@@ -31,3 +31,10 @@ def import_sync_state(payload: dict):
             return {"status": "rejected"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid sync state: {e}")
+
+@router.get("/sync/conflicts")
+def get_sync_conflicts():
+    """
+    Returns recent sync conflicts and resolutions.
+    """
+    return mission_scheduler.conflict_resolver.get_conflicts()
