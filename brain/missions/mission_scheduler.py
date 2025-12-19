@@ -20,7 +20,7 @@ import heapq
 import time
 import logging
 from dataclasses import dataclass, field
-from enum import IntEnum
+from enum import IntEnum, Enum
 from typing import List, Optional, Any
 
 from brain.optimization.mission_optimizer import OptimizationHint, OptimizationAction
@@ -43,6 +43,13 @@ from brain.events.event_bus import event_bus
 from brain.events.event_types import EventType
 
 logger = logging.getLogger(__name__)
+
+class BrainPhase(Enum):
+    OBSERVE = "observe"
+    ANALYZE = "analyze"
+    DECIDE = "decide"
+    EXECUTE = "execute"
+    RECORD = "record"
 
 class MissionPriority(IntEnum):
     BACKGROUND = 1
@@ -168,6 +175,11 @@ class MissionScheduler:
     def __init__(self):
         self._queue: List[QueuedMission] = []
         self._active_mission: Optional[QueuedMission] = None
+        
+        # S3: Phase & Invariant Tracking
+        self._current_phase: Optional[BrainPhase] = None
+        self._pending_ledger_entries: List[AutonomyDecision] = []
+        self._cycle_auto_actions: List[Any] = []
         
         # Event Bus
         self.event_bus = event_bus
@@ -305,7 +317,19 @@ class MissionScheduler:
         
         # ... (Services) ...
 
+
     # ... (Properties and Setters) ...
+
+    def _enter_phase(self, phase: BrainPhase):
+        self._current_phase = phase
+
+    def _assert_phase(self, allowed: List[BrainPhase]):
+        if self._current_phase not in allowed:
+            raise RuntimeError(
+                f"Illegal operation in phase {self._current_phase}. "
+                f"Allowed: {allowed}"
+            )
+
     
     def get_confidence_info(self):
         # Return info for the active device
@@ -1043,17 +1067,18 @@ class MissionScheduler:
         self.governance_service.check_vote_authority(proposal, user_id, approved)
         self.event_bus.emit(EventType.COPLAN_VOTE_REGISTERED, {"proposal_id": proposal.proposal_id, "user_id": user_id, "approved": approved})
 
-    # NOTE:
-    # No feature flags, experimental branches, or conditional behavior
-    # are allowed in tick() during stabilization.
+
     def tick(self, override_now: float = None) -> Optional[str]:
         self._current_tick_time = override_now if override_now is not None else time.time()
         self.event_bus.emit(EventType.SCHEDULER_TICK, {"time": self._current_tick_time})
         
         # Reset Cycle State
+        self._current_phase = None
         self._cycle_signals = []
         self._cycle_active_suggestions = []
         self._cycle_decision = None # e.g. ("START", mission) or ("PREEMPT", None)
+        self._cycle_auto_actions = []
+        self._pending_ledger_entries = []
         
         self._run_observe_phase()
         self._run_analyze_phase()
@@ -1061,6 +1086,7 @@ class MissionScheduler:
         self._run_execute_phase()
         self._run_record_phase()
         
+        self._current_phase = None
         return self._cycle_decision_outcome if hasattr(self, '_cycle_decision_outcome') else None
 
     # PHASE GUARANTEE:
@@ -1068,6 +1094,8 @@ class MissionScheduler:
     # No cross-phase side effects allowed.
     def _run_observe_phase(self):
         """Collect signals, device state, external inputs"""
+        self._enter_phase(BrainPhase.OBSERVE)
+        
         # v11.0 Ambient Observer
         self.ambient_observer.tick()
         
@@ -1079,6 +1107,8 @@ class MissionScheduler:
     # No cross-phase side effects allowed.
     def _run_analyze_phase(self):
         """Reflection, summaries, confidence updates"""
+        self._enter_phase(BrainPhase.ANALYZE)
+        
         # v12.3 Check Escalations
         escalated = self.emergency_manager.check_escalation()
         for e in escalated:
@@ -1094,6 +1124,7 @@ class MissionScheduler:
     # No cross-phase side effects allowed.
     def _run_decide_phase(self):
         """Decisions, suggestions, action selection"""
+        self._enter_phase(BrainPhase.DECIDE)
         self._cycle_decision_outcome = None
         
         # 1. Process External Signals (Decision Logic)
@@ -1169,7 +1200,6 @@ class MissionScheduler:
                 self._log_autonomy_decision(DecisionType.EXTERNAL_SUGGESTION_BLOCKED, reason=f"{block_reason} (Signal: {sig.signal_id})", was_auto=False)
         
         # 2. Process Proactive Suggestions (Auto-Execution Logic)
-        # Note: This technically crosses into Execute, but the decision to execute matches here.
         for sg in self._cycle_proactive_suggestions:
             # Log SUGGESTED
             self._log_autonomy_decision(DecisionType.SUGGESTED, sg.suggestion_id, sg.action_id, sg.message, was_auto=False)
@@ -1189,18 +1219,10 @@ class MissionScheduler:
                     )
                     
                     if allowed:
-                        print(f"[AUTONOMY] Auto-Executing {sg.action_id} (Reason: {reason})")
-                        # Execution Logic (Inline for now to preserve behavior)
-                        try:
-                            result = act_def.executor()
-                            sg.status = SuggestionStatus.AUTO_EXECUTED
-                            self.autonomy_policy.record_success(sg.action_id)
-                            self._log_autonomy_decision(DecisionType.AUTO_EXECUTED, sg.suggestion_id, sg.action_id, reason, was_auto=True)
-                            self.event_bus.emit(EventType.MISSION_COMPLETED, {"action": sg.action_id, "result": result, "mode": "AUTO"})
-                        except Exception as e:
-                            print(f"[AUTONOMY] Execution Failed: {e}")
-                            self.autonomy_policy.disable_autonomy(f"Execution Error: {e}")
-
+                        print(f"[AUTONOMY] Scheduling Auto-Execution for {sg.action_id} (Reason: {reason})")
+                        # DEFER EXECUTION to Execute Phase
+                        self._cycle_auto_actions.append((sg, act_def, reason))
+                        
         if self._cycle_proactive_suggestions:
              print(f"[PROACTIVE] Processed {len(self._cycle_proactive_suggestions)} new suggestions.")
 
@@ -1231,18 +1253,50 @@ class MissionScheduler:
     # No cross-phase side effects allowed.
     def _run_execute_phase(self):
         """Sandboxed execution only"""
+        self._enter_phase(BrainPhase.EXECUTE)
+        
+        # 1. Mission Lifecycle Execution
         if self._cycle_decision:
             action, payload = self._cycle_decision
             if action == "START":
                 self._start_mission(payload)
             elif action == "PREEMPT":
                 self._preempt_active()
+        
+        # 2. Proactive Auto-Execution
+        for item in self._cycle_auto_actions:
+            sg, act_def, reason = item
+            try:
+                # INVARIANT: Execution allowed only in EXECUTE phase
+                self._assert_phase([BrainPhase.EXECUTE])
+                
+                result = act_def.executor()
+                sg.status = SuggestionStatus.AUTO_EXECUTED
+                self.autonomy_policy.record_success(sg.action_id)
+                
+                # Log execution success (Buffered)
+                self._log_autonomy_decision(DecisionType.AUTO_EXECUTED, sg.suggestion_id, sg.action_id, reason, was_auto=True)
+                self.event_bus.emit(EventType.MISSION_COMPLETED, {"action": sg.action_id, "result": result, "mode": "AUTO"})
+            except Exception as e:
+                print(f"[AUTONOMY] Execution Failed: {e}")
+                self.autonomy_policy.disable_autonomy(f"Execution Error: {e}")
 
     # PHASE GUARANTEE:
     # This method must not call later phases.
     # No cross-phase side effects allowed.
     def _run_record_phase(self):
         """Ledger, persistence, memory writes"""
+        self._enter_phase(BrainPhase.RECORD)
+        
+        # 1. Flush Ledger
+        if self._pending_ledger_entries:
+            self._assert_phase([BrainPhase.RECORD])
+            for d in self._pending_ledger_entries:
+                self.autonomy_ledger.append(d)
+            self._pending_ledger_entries.clear()
+            
+        # 2. Persist User Context if needed (Optional hook, usually strictly on events, but safe here)
+        # self.save_user_context() # Not strictly required every tick, expensive.
         pass
 
 
@@ -1294,8 +1348,11 @@ class MissionScheduler:
                 device_id=dev_id,
                 was_auto=was_auto
             )
-            self.autonomy_ledger.append(decision)
+            # S3: Buffer decisions for RECORD phase
+            self._pending_ledger_entries.append(decision)
+            
         except Exception as e:
             print(f"[LEDGER] Error logging decision: {e}")
+
 
 mission_scheduler = MissionScheduler()
