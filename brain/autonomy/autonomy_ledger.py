@@ -59,6 +59,10 @@ class DecisionType(Enum):
     OVERRIDE_GRANTED = "override_granted"
     OVERRIDE_USED = "override_used"
     OVERRIDE_EXPIRED = "override_expired"
+    EXECUTION_STATE_PERSISTED = "execution_state_persisted"
+    EXECUTION_INTERRUPTED = "execution_interrupted"
+    EXECUTION_RECOVERY_REQUIRED = "execution_recovery_required"
+    EXECUTION_ABORTED_BY_RESTART = "execution_aborted_by_restart"
 
 @dataclass
 class AutonomyDecision:

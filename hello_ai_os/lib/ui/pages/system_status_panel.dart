@@ -313,6 +313,41 @@ class SystemStatusPanel extends StatelessWidget {
     }
   }
 
+  Future<void> _checkRuntimeState() async {
+    try {
+      final response = await http.get(Uri.parse('http://127.0.0.1:8000/runtime/state'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['action_phase'] == 'INTERRUPTED') {
+             _showInterruptionDialog(data['active_action_id']);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  
+  void _showInterruptionDialog(String actionId) {
+     // Check if already showing to avoid spam? 
+     // For simplicity, we'll just show a persistent bottom sheet or banner.
+     // But dialog is requested.
+     // Actually requirement says "SystemStatusPanel: Banner... Buttons".
+     // I'll add a boolean state `_isInterrupted` and show a banner in the build method.
+     setState(() {
+         _interruptedActionId = actionId;
+     });
+  }
+  
+  String? _interruptedActionId;
+
+  Future<void> _resolveInterruption(String actionId, String resolution) async {
+      final endpoint = resolution == "retry" ? "/runtime/recover/$actionId" : "/runtime/abort/$actionId";
+      await _apiCall(endpoint, method: "POST");
+      setState(() {
+          _interruptedActionId = null;
+      });
+  }
+
   Future<void> _requestOverride() async {
     bool? confirm = await showDialog<bool>(
       context: context,

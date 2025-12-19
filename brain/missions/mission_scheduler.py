@@ -87,6 +87,7 @@ from brain.actions.action_result import ActionStatus
 from brain.autonomy.autonomy_budget_manager import AutonomyBudgetManager
 from brain.autonomy.recovery_manager import RecoveryManager
 from brain.autonomy.override_manager import OverrideManager, OverrideScope
+from brain.runtime.execution_state_store import ExecutionStateStore, ActionPhase, ExecutionState
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -279,6 +280,10 @@ class MissionScheduler:
         self.budget_manager = AutonomyBudgetManager(self.autonomy_ledger)
         self.recovery_manager = RecoveryManager(self.autonomy_ledger)
         self.override_manager = OverrideManager(self.autonomy_ledger)
+        self.execution_store = ExecutionStateStore()
+        
+        # Check for Crash Recovery
+        self._check_startup_recovery()
         
         # ... (Services) ...
 

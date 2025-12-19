@@ -34,18 +34,32 @@ class ActionSandbox:
     def register_capability(self, cap: ActionCapability):
         self._capabilities[cap.action_id] = cap
 
+from brain.runtime.execution_state import ExecutionState, ActionPhase
+import time
+
     def execute_action(self, action_id: str, requesting_agent: str = "User") -> ActionResult:
         cap = self._capabilities.get(action_id)
         if not cap:
             self._log(DecisionType.ACTION_BLOCKED, action_id, "Unknown Action ID")
             return ActionResult(action_id, ActionStatus.FAILED, False, error_reason="Unknown ID")
 
-        # Safety Check via Scheduler context
+        # Safety Check via Scheduler
         if not self.scheduler.is_safe_to_execute(cap):
             self._log(DecisionType.ACTION_BLOCKED, action_id, "Safety Checks Failed")
             return ActionResult(action_id, ActionStatus.FAILED, cap.reversible, error_reason="Safety Blocked")
 
-        # Execution (Sandbox simulation)
+        # PERSISTENCE (v22.0)
+        store = getattr(self.scheduler, 'execution_store', None)
+        if store:
+            state = ExecutionState(
+                active_action_id=action_id,
+                action_phase=ActionPhase.EXECUTING,
+                started_at=time.time(),
+                context_snapshot={"trust": self.scheduler.device_trust_score}
+            )
+            store.update_state(state)
+
+        # Execution
         try:
             # Enforce Timeout (Simulator)
             start = time.time()
@@ -54,21 +68,29 @@ class ActionSandbox:
             elif action_id == "demo_risky_reset":
                  print(f"[SANDBOX] RESET! Executed by {requesting_agent}")
             
-            # Simulated processing time check
+            # Simulated processing
             if time.time() - start > 1.0:
                  raise TimeoutError("Action exceeded 1s execution limit")
             
             self._log(DecisionType.ACTION_EXECUTED, action_id, "Success")
             self._log(DecisionType.ACTION_RESULT_RECORDED, action_id, "Result: SUCCESS")
             
-            # Feedback Loop: Update Scheduler/Trust
             self.scheduler.record_action_outcome(action_id, ActionStatus.SUCCESS)
+            
+            # PERSISTENCE: Success
+            if store:
+                store.update_phase(ActionPhase.COMPLETED)
 
             return ActionResult(action_id, ActionStatus.SUCCESS, cap.reversible)
 
         except Exception as e:
             self._log(DecisionType.ACTION_BLOCKED, action_id, f"Runtime Error: {e}")
             self.scheduler.record_action_outcome(action_id, ActionStatus.FAILED)
+            
+            # PERSISTENCE: Failure (Handled Error)
+            if store:
+                store.update_phase(ActionPhase.FAILED, error=str(e))
+                
             return ActionResult(action_id, ActionStatus.FAILED, cap.reversible, error_reason=str(e))
             
     def revert_action(self, action_id: str) -> bool:
