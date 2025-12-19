@@ -1,0 +1,11 @@
+{
+  "min_display_threshold": "medium",
+  "domains": {
+    "system": {
+      "domain": "system",
+      "importance_level": "low",
+      "source": "USER",
+      "updated_at": 1766136109.2647946
+    }
+  }
+}

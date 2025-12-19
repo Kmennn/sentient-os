@@ -10,6 +10,7 @@ class PreferenceStore:
         self.meaning_memory = meaning_memory
         self.persistence_path = persistence_path
         self._preferences: Dict[str, ExplicitPreference] = {} # domain -> ExplicitPreference
+        self.min_display_threshold = ImportanceLevel.MEDIUM
         self._load()
         
     def _load(self):
@@ -19,16 +20,47 @@ class PreferenceStore:
         try:
             with open(self.persistence_path, "r") as f:
                 data = json.load(f)
-                for domain, d in data.items():
+                
+                # Load Threshold if exists
+                if "min_display_threshold" in data:
+                    try:
+                        self.min_display_threshold = ImportanceLevel(data["min_display_threshold"])
+                    except:
+                        pass
+                
+                # Load Domains
+                domains = data.get("domains", {})
+                # Backward compatibility for flat structure if needed, but we just started v15.0 so flat is likely.
+                # v15.0 saved {domain: dict}.
+                # We need to migrate or handle both.
+                # Let's check structure. v15.0 `_save` did: `data = {k: v.to_dict() ...}`
+                # So if we want to add root fields, we need to change structure to `{"domains": {...}, "threshold": ...}`
+                # Detection: if keys are domains or fixed keys.
+                
+                # Migration logic:
+                if "domains" not in data and len(data) > 0 and "min_display_threshold" not in data:
+                     # Old format (v15.0) - assume all keys are domains
+                     domains = data
+                elif "domains" in data:
+                     domains = data["domains"]
+                else:
+                     domains = {} # Empty or new structure only
+                
+                for domain, d in domains.items():
                     d['importance_level'] = ImportanceLevel(d['importance_level'])
                     self._preferences[domain] = ExplicitPreference(**d)
+                    
         except Exception as e:
             print(f"Error loading preferences: {e}")
 
     def _save(self):
         try:
             os.makedirs(os.path.dirname(self.persistence_path), exist_ok=True)
-            data = {k: v.to_dict() for k, v in self._preferences.items()}
+            # New Structure
+            data = {
+                "min_display_threshold": self.min_display_threshold.value,
+                "domains": {k: v.to_dict() for k, v in self._preferences.items()}
+            }
             with open(self.persistence_path, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:

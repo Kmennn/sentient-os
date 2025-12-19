@@ -168,7 +168,9 @@ def get_current_state() -> SystemState:
         # v14.2
         meaning_memory_available=True,
         # v15.0
-        explicit_preferences_available=True
+        explicit_preferences_available=True,
+        # v15.1
+        last_alert_filtered=any(s.is_filtered for s in mission_scheduler.proactive_engine.active_suggestions)
     )
 
 @app.post("/interrupts/{request_id}/respond")

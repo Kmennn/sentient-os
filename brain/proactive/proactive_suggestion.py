@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import time
+from typing import Dict
 from enum import Enum
 
 class SuggestionType(Enum):
@@ -33,6 +34,13 @@ class ProactiveSuggestion:
     visibility_level: VisibilityLevel = VisibilityLevel.NORMAL
     visibility_explanation: str = ""
     
+    # v15.1 Store extra context (domain, risk_level)
+    metadata: Dict = field(default_factory=dict)
+    
+    # v15.1 Filtering
+    is_filtered: bool = False
+    filtered_reason: str = None
+    
     def to_dict(self):
         return {
             "suggestion_id": self.suggestion_id,
@@ -44,5 +52,8 @@ class ProactiveSuggestion:
             "status": self.status.value,
             "action_id": self.action_id,
             "visibility_level": self.visibility_level.value,
-            "visibility_explanation": self.visibility_explanation
+            "visibility_explanation": self.visibility_explanation,
+            "metadata": self.metadata,
+            "is_filtered": self.is_filtered,
+            "filtered_reason": self.filtered_reason
         }

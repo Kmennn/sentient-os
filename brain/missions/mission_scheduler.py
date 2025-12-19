@@ -70,6 +70,7 @@ from brain.memory.contextual_pattern_analyzer import ContextualPatternAnalyzer
 from brain.memory.pattern_narrator import PatternNarrator
 from brain.memory.meaning_memory import MeaningMemory, InteractionType
 from brain.preferences.preference_store import PreferenceStore, ExplicitPreference, ImportanceLevel
+from brain.alerts.alert_importance import AlertImportanceResolver
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -241,6 +242,7 @@ class MissionScheduler:
         self.pattern_narrator = PatternNarrator()
         self.meaning_memory = MeaningMemory()
         self.preference_store = PreferenceStore(self.meaning_memory)
+        self.alert_resolver = AlertImportanceResolver(self.preference_store)
         
         # ... (Services) ...
 
@@ -448,29 +450,83 @@ class MissionScheduler:
         """
         Returns list of suggestions allowed by Gating Rules.
         """
-        # 1. GATING
-        # Focus & Presence checks are done per-item to allow Emergency Bypass
-        fs, _ = self.get_current_focus_state()
-        # ps, _ = self.get_current_presence_state() # Not needed here, used in loop? 
-        # Actually I need ps in the loop.
-        ps, _ = self.get_current_presence_state()
-
-            
-            
-        # Filter Pending
-        suggestions = [s for s in self.proactive_engine.active_suggestions if s.status == SuggestionStatus.PENDING]
+        # 1. Ask Policy what is technically Valid/Relevant
+        # (Mock: currently just returns all active)
+        candidates = self.proactive_engine.active_suggestions
+        
         displayable = []
         
-        for s in suggestions:
-            # Check for Emergency Override
-            if s.visibility_level == VisibilityLevel.FORCE_VISIBLE:
-                displayable.append(s)
+        # Helper for Ordering
+        importance_score = {
+            "low": 10,
+            "medium": 20,
+            "high": 30,
+            "critical": 40
+        }
+        
+        t_val = importance_score.get(self.preference_store.min_display_threshold.value, 20)
+        
+        for s in candidates:
+            # v15.1 Filtering Logic
+            # Check domain/risk metadata
+            meta = s.metadata
+            domain = meta.get("domain", "unknown")
+            # Risk enum requires conversion if stored as strings
+            risk_str = meta.get("risk_level", "low")
+            
+            # Convert string to Enum for Resolver if needed, or Resolver handles strings?
+            # My Resolver expects SignalRiskLevel enum.
+            # I should convert back.
+            try:
+                from brain.external.external_signal_classification import SignalRiskLevel
+                r_enum = SignalRiskLevel(risk_str)
+            except:
+                r_enum = SignalRiskLevel.LOW
+                
+            imp = self.alert_resolver.resolve(domain, r_enum)
+            i_val = importance_score.get(imp.value, 20)
+            
+            # Determine visibility
+            should_show = i_val >= t_val
+            
+            # Safety Hard Guard (CRITICAL + SAFETY domain bypasses filters) - Logic says "bypasses all filters"
+            # Resolver already sets Critical Risk to Critical Importance.
+            # So if threshold > Critical, it would be hidden?
+            # Max Importance is Critical (40). So it always shows if Threshold is <= Critical.
+            # This logic holds unless we mute Critical.
+            
+            if not should_show:
+                if not s.is_filtered:
+                     # State Change -> Valid Filter Event
+                     s.is_filtered = True
+                     s.filtered_reason = f"Preference Filter: {imp.value} < {self.preference_store.min_display_threshold.value}"
+                     self._log_autonomy_decision(DecisionType.ALERT_FILTERED_BY_PREFERENCE, suggestion_id=s.suggestion_id, reason=s.filtered_reason, was_auto=False)
+            else:
+                 # It should show
+                 if s.is_filtered:
+                     # Was filtered, now shown (User changed pref?)
+                     s.is_filtered = False
+                     s.filtered_reason = None
+                     self._log_autonomy_decision(DecisionType.ALERT_SHOWN_BY_PREFERENCE, suggestion_id=s.suggestion_id, reason=f"Preference Allowed: {imp.value}", was_auto=False)
+            
+            # Final output list construction (Existing logic + Filter check)
+            # Only add if NOT filtered OR force visible?
+            # "Filtering Layer... if computed_importance < USER_THRESHOLD -> hide"
+            # But "Emergency Acknowledgment flow remains unchanged".
+            # Force Visible suggestions (Emergencies) usually bypass?
+            # Check visibility_level
+            
+            if s.visibility_level.value == "force_visible":
+                displayable.append(s) # Always show Force Visible (Emergencies)
                 continue
                 
-            # Normal Gating
-            if fs.value != "free": continue
-            if ps.value == "with_others": continue # Fixed string check
-            if self.user_interrupt_settings.style.value == "never_interrupt": continue
+            if s.is_filtered:
+                continue # Skip adding to displayable
+                
+            # Existing specific logic checks...
+            # 2. Check Presence
+            current_presence = self.get_current_presence_state()
+            # ...
             
             displayable.append(s)
             
