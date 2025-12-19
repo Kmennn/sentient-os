@@ -63,6 +63,7 @@ from brain.external.external_suggestion_adapter import ExternalSuggestionAdapter
 from brain.external.emergency_visibility_policy import EmergencyVisibilityPolicy
 from brain.external.emergency_escalation import EmergencyEscalationManager
 from brain.contextual.contextual_search_engine import ContextualSearchEngine
+from brain.contextual.contextual_narrator import ContextualNarrator
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -228,6 +229,7 @@ class MissionScheduler:
         self.emergency_policy = EmergencyVisibilityPolicy()
         self.emergency_manager = EmergencyEscalationManager()
         self.contextual_search = ContextualSearchEngine()
+        self.contextual_narrator = ContextualNarrator()
         
         # ... (Services) ...
 
@@ -809,6 +811,10 @@ class MissionScheduler:
                     # Trigger analysis on Critical Signal
                     search_res = self.contextual_search.perform_search(query=sig.title + " mitigation", signal_id=sig.signal_id)
                     self._log_autonomy_decision(DecisionType.CONTEXTUAL_SEARCH_PERFORMED, suggestion_id=suggestion.suggestion_id, reason=f"Conf: {search_res.confidence_score}", was_auto=False)
+                    
+                    # v13.1 Contextual Narrator
+                    narration = self.contextual_narrator.narrate(search_res)
+                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_NARRATION_GENERATED, suggestion_id=suggestion.suggestion_id, reason=f"Len: {len(narration.summary_text)}", was_auto=False)
                 
                 self.proactive_engine.active_suggestions.append(suggestion)
                 print(f"[EXTERNAL] Suggestion Created: {suggestion.message} (Vis: {suggestion.visibility_level.value})")

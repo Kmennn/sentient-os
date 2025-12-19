@@ -149,7 +149,9 @@ def get_current_state() -> SystemState:
         last_emergency_reason=next((s.visibility_explanation for s in mission_scheduler.get_displayable_suggestions() if s.visibility_level.value == "force_visible"), ""),
         # v12.3
         pending_emergency_count=len(mission_scheduler.emergency_manager.get_pending()),
-        highest_escalation_level=mission_scheduler.emergency_manager.get_highest_level()
+        highest_escalation_level=mission_scheduler.emergency_manager.get_highest_level(),
+        # v13.1
+        last_contextual_narration_available=len(mission_scheduler.contextual_narrator._narrations) > 0
     )
 
 @app.post("/interrupts/{request_id}/respond")

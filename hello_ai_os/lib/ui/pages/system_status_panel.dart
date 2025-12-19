@@ -120,7 +120,7 @@ class SystemStatusPanel extends StatelessWidget {
                     trust: trust,
                     isActive: isActive,
                   );
-                }).toList(),
+                }),
 
                 const SizedBox(height: 30),
                 _SectionHeader(title: "MANUAL OVERRIDES", icon: Icons.tune),

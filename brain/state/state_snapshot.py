@@ -34,6 +34,8 @@ class SystemState(BaseModel):
     # v12.3
     pending_emergency_count: int = 0
     highest_escalation_level: int = 0
+    # v13.1
+    last_contextual_narration_available: bool = False
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}
