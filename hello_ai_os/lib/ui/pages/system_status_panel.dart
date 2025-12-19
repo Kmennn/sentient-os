@@ -267,6 +267,24 @@ class SystemStatusPanel extends StatelessWidget {
                             ),
                           ),
                         ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Override Control
+                       _ControlRow(
+                        label: "Safety Override",
+                        child: _isOverrideActive 
+                          ? const Text("ACTIVE", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
+                          : GestureDetector(
+                              onTap: _requestOverride,
+                              child: const Text(
+                                "ENABLE", 
+                                style: TextStyle(
+                                  color: Colors.grey, 
+                                  decoration: TextDecoration.underline
+                                )
+                              ),
+                            ),
                       ),
                     ],
                   ),
@@ -292,6 +310,39 @@ class SystemStatusPanel extends StatelessWidget {
       await http.post(uri);
     } catch (e) {
       print("API Error: $e");
+    }
+  }
+
+  Future<void> _requestOverride() async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Forced Execution"),
+        content: const Text(
+          "This bypasses all safety checks (Confidence, Budget, Recovery). "
+          "It will result in an immediate trust penalty.\n\n"
+          "Are you sure?"
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(
+             onPressed: () => Navigator.pop(context, true), 
+             child: const Text("FORCE EXECUTE", style: TextStyle(color: Colors.red))
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      _apiCall("/autonomy/override", method: "POST", body: {
+        "scope": "ACTION",
+        "reason": "User Manual Force"
+      });
+      // Refresh status after delay
+      Future.delayed(const Duration(seconds: 1), _checkOverrideStatus);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Safety Override Enabled for 10 minutes.")),
+      );
     }
   }
 

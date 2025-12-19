@@ -86,6 +86,7 @@ from brain.actions.action_capability import ActionCapability, ActionRisk
 from brain.actions.action_result import ActionStatus
 from brain.autonomy.autonomy_budget_manager import AutonomyBudgetManager
 from brain.autonomy.recovery_manager import RecoveryManager
+from brain.autonomy.override_manager import OverrideManager, OverrideScope
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -277,6 +278,7 @@ class MissionScheduler:
         self.action_sandbox = ActionSandbox(self.autonomy_ledger, self)
         self.budget_manager = AutonomyBudgetManager(self.autonomy_ledger)
         self.recovery_manager = RecoveryManager(self.autonomy_ledger)
+        self.override_manager = OverrideManager(self.autonomy_ledger)
         
         # ... (Services) ...
 
@@ -425,6 +427,21 @@ class MissionScheduler:
         return self.last_confidence
 
     def is_safe_to_execute(self, cap: ActionCapability) -> bool:
+        # -2. Override Check (v21.2)
+        if self.override_manager.has_override(OverrideScope.ACTION):
+             print(f"[Scheduler] {cap.action_id}: FORCED EXECUTION (Override Active)")
+             
+             # Trust Penalty
+             penalty = -0.10
+             if self.recovery_manager.state.level == "HARD": # String comparison or enum if imported
+                  penalty -= 0.10 # Hard recovery forced = -20%
+             
+             print(f"[Scheduler] Override Penalty: {penalty}")
+             self.update_device_trust(penalty)
+             
+             self.override_manager.use_override(OverrideScope.ACTION, cap.action_id)
+             return True
+
         # -1. Recovery Check (v21.1)
         if self.recovery_manager.is_action_blocked():
              print(f"[Scheduler] Blocked {cap.action_id}: System in Recovery Mode.")

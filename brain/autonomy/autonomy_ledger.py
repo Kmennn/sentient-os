@@ -55,6 +55,10 @@ class DecisionType(Enum):
     RECOVERY_ENTERED = "recovery_entered"
     RECOVERY_EXITED = "recovery_exited"
     RECOVERY_BLOCKED_ACTION = "recovery_blocked_action"
+    OVERRIDE_REQUESTED = "override_requested"
+    OVERRIDE_GRANTED = "override_granted"
+    OVERRIDE_USED = "override_used"
+    OVERRIDE_EXPIRED = "override_expired"
 
 @dataclass
 class AutonomyDecision:
