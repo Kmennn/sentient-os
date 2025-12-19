@@ -143,8 +143,63 @@ class _SummarySection extends StatelessWidget {
                 mixStr,
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white10),
+              const SizedBox(height: 8),
+              _ConfidenceFooter(),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class _ConfidenceFooter extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: timelineService.confidenceStream,
+      initialData: timelineService.lastConfidence,
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? {};
+        final level = data['level'] ?? "HIGH";
+        final since = data['since'] ?? "";
+
+        // Format time if needed, assuming API sends full ISO
+        String sinceDisplay = since;
+        try {
+          if (since.isNotEmpty) {
+            final dt = DateTime.parse(since);
+            sinceDisplay =
+                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+          }
+        } catch (e) {}
+
+        return Row(
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: level == "HIGH"
+                  ? Colors.greenAccent
+                  : (level == "MEDIUM" ? Colors.amber : Colors.redAccent),
+              size: 14,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              "SYSTEM CONFIDENCE: $level",
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (sinceDisplay.isNotEmpty)
+              Text(
+                " (since $sinceDisplay)",
+                style: const TextStyle(color: Colors.white30, fontSize: 10),
+              ),
+          ],
         );
       },
     );

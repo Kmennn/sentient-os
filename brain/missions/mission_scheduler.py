@@ -80,6 +80,7 @@ from brain.sync.state_importer import StateImporter
 from brain.sync.conflict_resolver import ConflictResolver
 from brain.timeline.timeline_builder import TimelineBuilder
 from brain.timeline.cognitive_summary import CognitiveSummaryEngine, CognitiveSummary
+from brain.timeline.system_confidence import ConfidenceEngine, SystemConfidence
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -267,6 +268,7 @@ class MissionScheduler:
         self.timeline_builder = TimelineBuilder(self.autonomy_ledger)
         self.last_summary: CognitiveSummary = None
         self.last_summary_time = 0
+        self.last_confidence: SystemConfidence = None
         
         # ... (Services) ...
 
@@ -403,9 +405,16 @@ class MissionScheduler:
             # Build 24h timeline
             events = self.timeline_builder.build_timeline(duration_seconds=86400)
             self.last_summary = CognitiveSummaryEngine.summarize(events)
+            self.last_confidence = ConfidenceEngine.evaluate(events, self.last_confidence)
             self.last_summary_time = now
             
         return self.last_summary
+
+    def get_system_confidence(self) -> SystemConfidence:
+        # Ensure we have data
+        if self.last_confidence is None:
+             self.get_summary() # trigger build
+        return self.last_confidence
 
     def clear_presence(self):
         self.manual_presence_provider.clear()

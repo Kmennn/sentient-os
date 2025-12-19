@@ -17,6 +17,11 @@ class TimelineService {
   final _summaryController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get summaryStream => _summaryController.stream;
 
+  final _confidenceController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get confidenceStream =>
+      _confidenceController.stream;
+
   // Cache
   List<Map<String, dynamic>> _lastEvents = [];
   List<Map<String, dynamic>> get lastEvents => _lastEvents;
@@ -24,17 +29,37 @@ class TimelineService {
   Map<String, dynamic> _lastSummary = {};
   Map<String, dynamic> get lastSummary => _lastSummary;
 
+  Map<String, dynamic> _lastConfidence = {};
+  Map<String, dynamic> get lastConfidence => _lastConfidence;
+
   Timer? _timer;
 
   void _startPolling() {
     // Initial fetch
     fetchTimeline();
     fetchSummary();
+    fetchConfidence();
     // Poll
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
       fetchTimeline();
       fetchSummary();
+      fetchConfidence();
     });
+  }
+
+  Future<void> fetchConfidence() async {
+    try {
+      final uri = Uri.parse("http://127.0.0.1:8000/system/confidence");
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _lastConfidence = data;
+        _confidenceController.add(data);
+      }
+    } catch (e) {
+      print("Confidence fetch error: $e");
+    }
   }
 
   Future<void> fetchSummary() async {
@@ -77,6 +102,7 @@ class TimelineService {
     _timer?.cancel();
     _controller.close();
     _summaryController.close();
+    _confidenceController.close();
   }
 }
 
