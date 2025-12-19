@@ -81,6 +81,10 @@ class DecisionType(Enum):
     EXECUTION_INTERRUPTED = "execution_interrupted"
     EXECUTION_RECOVERY_REQUIRED = "execution_recovery_required"
     EXECUTION_ABORTED_BY_RESTART = "execution_aborted_by_restart"
+    SLOW_TICK_DETECTED = "slow_tick_detected"
+    BACKPRESSURE_ENABLED = "backpressure_enabled"
+    BACKPRESSURE_CLEARED = "backpressure_cleared"
+    INVARIANT_VIOLATION = "invariant_violation"
 
 @dataclass
 class AutonomyDecision:

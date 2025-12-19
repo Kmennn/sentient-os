@@ -123,6 +123,7 @@ from brain.actions.action_capability import ActionCapability, ActionRisk
 from brain.actions.action_result import ActionStatus
 from brain.autonomy.autonomy_budget_manager import AutonomyBudgetManager
 from brain.autonomy.recovery_manager import RecoveryManager
+from brain.autonomy.recovery_state import RecoveryLevel
 from brain.autonomy.override_manager import OverrideManager, OverrideScope
 from brain.runtime.execution_state_store import ExecutionStateStore, ActionPhase, ExecutionState
 from brain.proactive.proactive_suggestion import VisibilityLevel
@@ -1158,6 +1159,47 @@ class MissionScheduler:
         self._tick_context = None # Clear Scope
         return self._cycle_decision_outcome if hasattr(self, '_cycle_decision_outcome') else None
 
+    # S7: Invariant Checking
+    def _log_invariant_violation(self, code: str):
+        self._pending_ledger_entries.append(AutonomyDecision(
+            decision_id=str(uuid.uuid4()),
+            decision_type=DecisionType.INVARIANT_VIOLATION,
+            timestamp=time.time(),
+            reason=f"Code: {code} | Phase: {self._current_phase.name if self._current_phase else 'None'} | Tick: {self._tick_context.tick_id}",
+            device_id=self.active_device_resolver.resolve()[0] if self.active_device_resolver else "unknown"
+        ))
+
+    def _check_invariants(self):
+        # 1. Never execute while startup is blocked
+        # Note: We check execution_store state which might be loaded from disk or in-memory
+        exec_state = self.execution_store.get_state()
+        if self._startup_blocked and exec_state.action_phase == ActionPhase.EXECUTING:
+            self._log_invariant_violation("EXECUTING_WHILE_STARTUP_BLOCKED")
+
+        # 2. Backpressure forbids autonomous actions
+        if self._backpressure_active and self._cycle_auto_actions:
+            self._log_invariant_violation("AUTO_ACTIONS_DURING_BACKPRESSURE")
+
+        # 3. HARD recovery forbids autonomy without override
+        # RecoveryLevel.HARD check
+        if (
+            self.recovery_manager.state.level == RecoveryLevel.HARD
+            and not self.override_manager.get_active_token()
+            and self._cycle_auto_actions
+        ):
+            self._log_invariant_violation("AUTO_ACTIONS_DURING_HARD_RECOVERY")
+
+        # FAIL FAST: If any invariant violation was logged this tick, we must Halt.
+        # We need to scan pending ledger entries for violation type efficiently.
+        # Since this method is called after decisions/before execution, we only care about
+        # violations generated JUST NOW or earlier in this tick.
+        
+        # Check pending violations in context
+        # Or scan _pending_ledger_entries for INVARIANT_VIOLATION
+        for entry in self._pending_ledger_entries:
+            if entry.decision_type == DecisionType.INVARIANT_VIOLATION:
+                 raise RuntimeError("Invariant violation detected — execution halted")
+
     # PHASE GUARANTEE:
     # This method must not call later phases.
     # No cross-phase side effects allowed.
@@ -1326,6 +1368,11 @@ class MissionScheduler:
             self._cycle_decision_outcome = "PREEMPT"
             return
 
+        # S7: Invariant Check (Post-Decision)
+        self._check_invariants()
+            
+    def _check_startup_recovery(self):
+
 
     def _check_startup_recovery(self):
         # S4: Check for Crash Interruption
@@ -1349,6 +1396,9 @@ class MissionScheduler:
     def _run_execute_phase(self):
         """Sandboxed execution only"""
         self._enter_phase(BrainPhase.EXECUTE)
+        
+        # S7: Invariant Check (Pre-Execution)
+        self._check_invariants()
         
         # S4: Execution Guard
         if self._startup_blocked:
