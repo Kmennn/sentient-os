@@ -79,6 +79,7 @@ from brain.sync.state_exporter import StateExporter
 from brain.sync.state_importer import StateImporter
 from brain.sync.conflict_resolver import ConflictResolver
 from brain.timeline.timeline_builder import TimelineBuilder
+from brain.timeline.cognitive_summary import CognitiveSummaryEngine, CognitiveSummary
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -264,6 +265,8 @@ class MissionScheduler:
         self.state_importer = StateImporter(self.preference_store, self.meaning_memory, self.autonomy_ledger, self.conflict_resolver)
         # v19.0
         self.timeline_builder = TimelineBuilder(self.autonomy_ledger)
+        self.last_summary: CognitiveSummary = None
+        self.last_summary_time = 0
         
         # ... (Services) ...
 
@@ -393,6 +396,17 @@ class MissionScheduler:
         print("Presence set to: PRIVATE")
         self.save_user_context()
         
+    def get_summary(self, force_refresh: bool = False) -> CognitiveSummary:
+        now = time.time()
+        # Refresh every 10 mins (600s) or if forced
+        if force_refresh or (now - self.last_summary_time > 600) or self.last_summary is None:
+            # Build 24h timeline
+            events = self.timeline_builder.build_timeline(duration_seconds=86400)
+            self.last_summary = CognitiveSummaryEngine.summarize(events)
+            self.last_summary_time = now
+            
+        return self.last_summary
+
     def clear_presence(self):
         self.manual_presence_provider.clear()
         print("Presence override cleared.")

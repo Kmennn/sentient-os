@@ -40,16 +40,113 @@ class TimelinePage extends StatelessWidget {
           // We want newest first in UI usually.
           final reversedEvents = List.from(events.reversed);
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: reversedEvents.length,
-            itemBuilder: (context, index) {
-              final e = reversedEvents[index];
-              return _EventCard(event: e);
-            },
+          return Column(
+            children: [
+              _SummarySection(),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: reversedEvents.length,
+                  itemBuilder: (context, index) {
+                    final e = reversedEvents[index];
+                    return _EventCard(event: e);
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+}
+
+class _SummarySection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: timelineService.summaryStream,
+      initialData: timelineService.lastSummary,
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? {};
+        if (data.isEmpty) return const SizedBox.shrink();
+
+        final headline = data['headline'] ?? "System is idle.";
+        final risk = data['risk_level'] ?? "LOW";
+        final mix =
+            data['agent_mix'] as Map<String, dynamic>? ??
+            {}; // Observer/Analyst/Governor
+
+        // Risk Color
+        Color riskColor = Colors.green;
+        if (risk == "MED") riskColor = Colors.amber;
+        if (risk == "HIGH") riskColor = Colors.redAccent;
+
+        // Format Mix
+        final mixStr = mix.entries
+            .map((e) => "${e.key}: ${e.value}%")
+            .join(" • ");
+
+        return Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: riskColor.withOpacity(0.1),
+            border: Border.all(color: riskColor.withOpacity(0.5)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "DAILY BRIEFING",
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: riskColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      risk,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                headline,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                mixStr,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

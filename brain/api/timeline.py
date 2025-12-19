@@ -11,3 +11,11 @@ def get_timeline(since_seconds: int = 86400):
     """
     events = mission_scheduler.timeline_builder.build_timeline(duration_seconds=since_seconds)
     return [e.to_dict() for e in events]
+
+@router.get("/timeline/summary")
+def get_timeline_summary():
+    """
+    Returns a high-level summary of cognitive activity.
+    """
+    summary = mission_scheduler.get_summary()
+    return summary.to_dict()
