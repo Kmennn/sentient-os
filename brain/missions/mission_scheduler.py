@@ -44,6 +44,13 @@ from brain.events.event_types import EventType
 
 logger = logging.getLogger(__name__)
 
+class TickContext:
+    def __init__(self, tick_id: str):
+        self.tick_id = tick_id
+        self.executed_actions = set()
+        self.ledger_entries = set()
+
+
 class BrainPhase(Enum):
     OBSERVE = "observe"
     ANALYZE = "analyze"
@@ -183,6 +190,9 @@ class MissionScheduler:
         
         # S4: Crash Safety
         self._startup_blocked: bool = False
+        
+        # S5: Tick Context (Idempotency)
+        self._tick_context: Optional[TickContext] = None
         
         # Event Bus
         self.event_bus = event_bus
@@ -1071,7 +1081,14 @@ class MissionScheduler:
         self.event_bus.emit(EventType.COPLAN_VOTE_REGISTERED, {"proposal_id": proposal.proposal_id, "user_id": user_id, "approved": approved})
 
 
+    # NOTE:
+    # No feature flags, experimental branches, or conditional behavior
+    # are allowed in tick() during stabilization.
     def tick(self, override_now: float = None) -> Optional[str]:
+        # S5: Create Tick Context (Deterministic Scope)
+        import uuid
+        self._tick_context = TickContext(tick_id=str(uuid.uuid4()))
+        
         self._current_tick_time = override_now if override_now is not None else time.time()
         self.event_bus.emit(EventType.SCHEDULER_TICK, {"time": self._current_tick_time})
         
@@ -1090,6 +1107,7 @@ class MissionScheduler:
         self._run_record_phase()
         
         self._current_phase = None
+        self._tick_context = None # Clear Scope
         return self._cycle_decision_outcome if hasattr(self, '_cycle_decision_outcome') else None
 
     # PHASE GUARANTEE:
@@ -1297,6 +1315,13 @@ class MissionScheduler:
                 # INVARIANT: Execution allowed only in EXECUTE phase
                 self._assert_phase([BrainPhase.EXECUTE])
                 
+                # S5: Actuation Idempotency Guard
+                action_key = f"{self._tick_context.tick_id}:{sg.action_id}"
+                if action_key in self._tick_context.executed_actions:
+                     print(f"[IDEMPOTENCY] Skipped duplicate action {sg.action_id} in tick {self._tick_context.tick_id}")
+                     continue
+                self._tick_context.executed_actions.add(action_key)
+                
                 result = act_def.executor()
                 sg.status = SuggestionStatus.AUTO_EXECUTED
                 self.autonomy_policy.record_success(sg.action_id)
@@ -1319,7 +1344,14 @@ class MissionScheduler:
         if self._pending_ledger_entries:
             self._assert_phase([BrainPhase.RECORD])
             for d in self._pending_ledger_entries:
+                # S5: Ledger Idempotency Guard
+                entry_key = f"{self._tick_context.tick_id}:{d.decision_type.value}:{d.decision_id}"
+                if entry_key in self._tick_context.ledger_entries:
+                    continue
+                
+                self._tick_context.ledger_entries.add(entry_key)
                 self.autonomy_ledger.append(d)
+                
             self._pending_ledger_entries.clear()
             
         # 2. Persist User Context if needed (Optional hook, usually strictly on events, but safe here)
