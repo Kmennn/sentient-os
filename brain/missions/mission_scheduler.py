@@ -64,6 +64,8 @@ from brain.external.emergency_visibility_policy import EmergencyVisibilityPolicy
 from brain.external.emergency_escalation import EmergencyEscalationManager
 from brain.contextual.contextual_search_engine import ContextualSearchEngine
 from brain.contextual.contextual_narrator import ContextualNarrator
+from brain.contextual.contextual_memory_store import ContextualMemoryStore
+from brain.contextual.contextual_history_analyzer import ContextualHistoryAnalyzer
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -230,6 +232,8 @@ class MissionScheduler:
         self.emergency_manager = EmergencyEscalationManager()
         self.contextual_search = ContextualSearchEngine()
         self.contextual_narrator = ContextualNarrator()
+        self.contextual_memory = ContextualMemoryStore()
+        self.history_analyzer = ContextualHistoryAnalyzer(self.contextual_memory)
         
         # ... (Services) ...
 
@@ -814,7 +818,22 @@ class MissionScheduler:
                     
                     # v13.1 Contextual Narrator
                     narration = self.contextual_narrator.narrate(search_res)
+                    
+                    # v14.0 History Analysis
+                    c7, c30, trend = self.history_analyzer.analyze_history(signal_domain=sig.domain.value, signal_title=sig.title)
+                    narration.historical_occurrences_7d = c7
+                    narration.historical_occurrences_30d = c30
+                    narration.trend_label = trend
+                    
                     self._log_autonomy_decision(DecisionType.CONTEXTUAL_NARRATION_GENERATED, suggestion_id=suggestion.suggestion_id, reason=f"Len: {len(narration.summary_text)}", was_auto=False)
+                    
+                    # v14.0 Record Memory
+                    # Enriched dict with 'title' for future analysis matching
+                    record = narration.to_dict()
+                    record["title"] = sig.title
+                    record["domain"] = sig.domain.value
+                    self.contextual_memory.record_event(record)
+                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_MEMORY_RECORDED, suggestion_id=suggestion.suggestion_id, reason=f"Trend: {trend}", was_auto=False)
                 
                 self.proactive_engine.active_suggestions.append(suggestion)
                 print(f"[EXTERNAL] Suggestion Created: {suggestion.message} (Vis: {suggestion.visibility_level.value})")

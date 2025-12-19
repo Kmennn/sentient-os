@@ -23,6 +23,7 @@ class DecisionType(Enum):
     EMERGENCY_ESCALATED = "emergency_escalated"
     CONTEXTUAL_SEARCH_PERFORMED = "contextual_search_performed"
     CONTEXTUAL_NARRATION_GENERATED = "contextual_narration_generated"
+    CONTEXTUAL_MEMORY_RECORDED = "contextual_memory_recorded"
 
 @dataclass
 class AutonomyDecision:

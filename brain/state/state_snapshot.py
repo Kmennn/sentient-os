@@ -36,6 +36,8 @@ class SystemState(BaseModel):
     highest_escalation_level: int = 0
     # v13.1
     last_contextual_narration_available: bool = False
+    # v14.0
+    contextual_history_available: bool = False
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}

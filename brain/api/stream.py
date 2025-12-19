@@ -151,7 +151,9 @@ def get_current_state() -> SystemState:
         pending_emergency_count=len(mission_scheduler.emergency_manager.get_pending()),
         highest_escalation_level=mission_scheduler.emergency_manager.get_highest_level(),
         # v13.1
-        last_contextual_narration_available=len(mission_scheduler.contextual_narrator._narrations) > 0
+        last_contextual_narration_available=len(mission_scheduler.contextual_narrator._narrations) > 0,
+        # v14.0
+        contextual_history_available=len(mission_scheduler.contextual_memory.get_history()) > 0
     )
 
 @app.post("/interrupts/{request_id}/respond")

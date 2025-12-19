@@ -16,3 +16,15 @@ def get_contextual_narration(signal_id: str):
     if res:
         return res.to_dict()
     raise HTTPException(status_code=404, detail="Narration not found for this signal")
+
+@router.get("/contextual/history/{signal_id}")
+def get_contextual_history(signal_id: str):
+    # Retrieve current narration object which contains the history
+    res = mission_scheduler.contextual_narrator.get_narration(signal_id)
+    if res:
+        return {
+            "occurrences_7d": res.historical_occurrences_7d,
+            "occurrences_30d": res.historical_occurrences_30d,
+            "trend": res.trend_label
+        }
+    raise HTTPException(status_code=404, detail="History not found for this signal")
