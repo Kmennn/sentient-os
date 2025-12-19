@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:hello_ai_os/services/state_stream_service.dart';
 import 'package:hello_ai_os/ui/widgets/glass_container.dart';
+import 'package:hello_ai_os/ui/timeline_page.dart';
 
 class SystemStatusPanel extends StatelessWidget {
   const SystemStatusPanel({super.key});
@@ -14,6 +15,21 @@ class SystemStatusPanel extends StatelessWidget {
         title: const Text("System Transparency"),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.psychology, color: Colors.cyanAccent),
+            label: const Text(
+              "Brain Log",
+              style: TextStyle(color: Colors.cyanAccent),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TimelinePage()),
+              );
+            },
+          ),
+        ],
       ),
       body: StreamBuilder<Map<String, dynamic>>(
         stream: stateStreamService.stateStream,
