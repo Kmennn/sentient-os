@@ -8,10 +8,8 @@ def execute_action(action_id: str):
     """
     Executes a registered action if safe.
     """
-    success = mission_scheduler.action_sandbox.execute_action(action_id, requesting_agent="API_User")
-    if not success:
-        raise HTTPException(status_code=403, detail="Action blocked by Safe Sandbox or ID unknown.")
-    return {"status": "executed", "action_id": action_id}
+    result = mission_scheduler.action_sandbox.execute_action(action_id, requesting_agent="API_User")
+    return result.to_dict()
 
 @router.post("/actions/{action_id}/revert")
 def revert_action(action_id: str):
@@ -22,3 +20,13 @@ def revert_action(action_id: str):
     if not success:
         raise HTTPException(status_code=400, detail="Action cannot be reverted.")
     return {"status": "reverted", "action_id": action_id}
+
+@router.get("/actions/history")
+def get_action_history():
+    """
+    Returns recent action execution history.
+    """
+    entries = mission_scheduler.autonomy_ledger.get_entries()
+    # Filter for action_executed
+    action_events = [e for e in entries if "action" in e.decision_type.value]
+    return [e.to_dict() for e in action_events[-20:]] # Last 20

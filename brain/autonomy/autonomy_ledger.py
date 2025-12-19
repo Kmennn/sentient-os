@@ -47,6 +47,9 @@ class DecisionType(Enum):
     ACTION_EXECUTED = "action_executed"
     ACTION_BLOCKED = "action_blocked"
     ACTION_REVERTED = "action_reverted"
+    ACTION_RESULT_RECORDED = "action_result_recorded"
+    ACTION_ROLLBACK_EXECUTED = "action_rollback_executed"
+    ACTION_ROLLBACK_FAILED = "action_rollback_failed"
 
 @dataclass
 class AutonomyDecision:

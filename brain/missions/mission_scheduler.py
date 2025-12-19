@@ -83,6 +83,7 @@ from brain.timeline.cognitive_summary import CognitiveSummaryEngine, CognitiveSu
 from brain.timeline.system_confidence import ConfidenceEngine, SystemConfidence, ConfidenceLevel
 from brain.actions.action_executor import ActionSandbox
 from brain.actions.action_capability import ActionCapability, ActionRisk
+from brain.actions.action_result import ActionStatus
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -442,6 +443,16 @@ class MissionScheduler:
 
         return True
 
+    def record_action_outcome(self, action_id: str, status: ActionStatus):
+        if status == ActionStatus.SUCCESS:
+            print(f"[Scheduler] Action {action_id} Success. +Trust")
+            self.update_device_trust(0.01) # Small increment
+        elif status == ActionStatus.FAILED:
+            print(f"[Scheduler] Action {action_id} Failed. -Trust")
+            self.update_device_trust(-0.05) # Penalty
+        # Re-calc confidence implicitly on next cycle or force?
+        # Maybe force summary update if critical failure.
+        
     def clear_presence(self):
         self.manual_presence_provider.clear()
         print("Presence override cleared.")

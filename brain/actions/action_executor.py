@@ -2,6 +2,8 @@ import time
 import uuid
 from typing import Dict, Optional
 from brain.actions.action_capability import ActionCapability, ActionRisk
+from brain.actions.action_result import ActionResult, ActionStatus
+from brain.actions.action_rollback import ActionRollback
 from brain.autonomy.autonomy_ledger import AutonomyLedger, AutonomyDecision, DecisionType
 
 class ActionSandbox:
@@ -32,16 +34,16 @@ class ActionSandbox:
     def register_capability(self, cap: ActionCapability):
         self._capabilities[cap.action_id] = cap
 
-    def execute_action(self, action_id: str, requesting_agent: str = "User") -> bool:
+    def execute_action(self, action_id: str, requesting_agent: str = "User") -> ActionResult:
         cap = self._capabilities.get(action_id)
         if not cap:
             self._log(DecisionType.ACTION_BLOCKED, action_id, "Unknown Action ID")
-            return False
+            return ActionResult(action_id, ActionStatus.FAILED, False, error_reason="Unknown ID")
 
         # Safety Check via Scheduler context
         if not self.scheduler.is_safe_to_execute(cap):
-            self._log(DecisionType.ACTION_BLOCKED, action_id, "Safety Checks Failed (Trust/Confidence/Focus)")
-            return False
+            self._log(DecisionType.ACTION_BLOCKED, action_id, "Safety Checks Failed")
+            return ActionResult(action_id, ActionStatus.FAILED, cap.reversible, error_reason="Safety Blocked")
 
         # Execution (Sandbox simulation)
         try:
@@ -57,21 +59,20 @@ class ActionSandbox:
                  raise TimeoutError("Action exceeded 1s execution limit")
             
             self._log(DecisionType.ACTION_EXECUTED, action_id, "Success")
-            return True
+            self._log(DecisionType.ACTION_RESULT_RECORDED, action_id, "Result: SUCCESS")
+            
+            # Feedback Loop: Update Scheduler/Trust
+            self.scheduler.record_action_outcome(action_id, ActionStatus.SUCCESS)
+
+            return ActionResult(action_id, ActionStatus.SUCCESS, cap.reversible)
 
         except Exception as e:
             self._log(DecisionType.ACTION_BLOCKED, action_id, f"Runtime Error: {e}")
-            return False
-
-    def revert_action(self, action_id: str) -> bool:
-        cap = self._capabilities.get(action_id)
-        if not cap or not cap.reversible:
-            self._log(DecisionType.ACTION_BLOCKED, action_id, "Cannot revert irreversible or unknown action")
-            return False
+            self.scheduler.record_action_outcome(action_id, ActionStatus.FAILED)
+            return ActionResult(action_id, ActionStatus.FAILED, cap.reversible, error_reason=str(e))
             
-        print(f"[SANDBOX] REVERTING {action_id}")
-        self._log(DecisionType.ACTION_REVERTED, action_id, "Reverted successfully")
-        return True
+    def revert_action(self, action_id: str) -> bool:
+        return ActionRollback.execute_rollback(action_id, self)
 
     def _log(self, dtype: DecisionType, action_id: str, reason: str):
         decision = AutonomyDecision(
