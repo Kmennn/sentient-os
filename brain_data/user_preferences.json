@@ -6,6 +6,12 @@
       "importance_level": "low",
       "source": "USER",
       "updated_at": 1766136109.2647946
+    },
+    "SYSTEM": {
+      "domain": "SYSTEM",
+      "importance_level": "medium",
+      "source": "USER",
+      "updated_at": 1766136766.031146
     }
   }
 }

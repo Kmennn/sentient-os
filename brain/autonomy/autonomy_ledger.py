@@ -33,6 +33,9 @@ class DecisionType(Enum):
     ALERT_SHOWN_BY_PREFERENCE = "alert_shown_by_preference"
     REFLECTION_POSITIVE = "reflection_positive"
     REFLECTION_NEGATIVE = "reflection_negative"
+    ADJUSTMENT_PROPOSED = "adjustment_proposed"
+    ADJUSTMENT_APPROVED = "adjustment_approved"
+    ADJUSTMENT_REJECTED = "adjustment_rejected"
 
 @dataclass
 class AutonomyDecision:

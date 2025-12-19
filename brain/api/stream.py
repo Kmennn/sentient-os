@@ -19,6 +19,7 @@ from brain.api.contextual import router as contextual_router
 from brain.api.memory import router as memory_router
 from brain.api.preferences import router as preferences_router
 from brain.api.reflection import router as reflection_router
+from brain.api.adjustments import router as adjustments_router
 
 logger = logging.getLogger("API")
 
@@ -29,6 +30,9 @@ app.include_router(emergency_router)
 app.include_router(contextual_router)
 app.include_router(memory_router)
 app.include_router(preferences_router)
+app.include_router(reflection_router)
+app.include_router(adjustments_router)
+app.include_router(adjustments_router)
 app.include_router(memory_router)
 app.include_router(preferences_router)
 
@@ -174,7 +178,9 @@ def get_current_state() -> SystemState:
         last_alert_filtered=any(s.is_filtered for s in mission_scheduler.proactive_engine.active_suggestions),
         # v16.0
         last_reflection_signal=mission_scheduler.reflection_engine.last_reflection_signal,
-        reflection_confidence=mission_scheduler.reflection_engine.reflection_confidence
+        reflection_confidence=mission_scheduler.reflection_engine.reflection_confidence,
+        # v16.1
+        pending_adjustments_count=len([p for p in mission_scheduler.adjustment_engine.active_proposals.values() if p.status.value == "pending"])
     )
 
 @app.post("/interrupts/{request_id}/respond")

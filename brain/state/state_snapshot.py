@@ -50,6 +50,8 @@ class SystemState(BaseModel):
     # v16.0
     last_reflection_signal: str = None
     reflection_confidence: float = 0.0
+    # v16.1
+    pending_adjustments_count: int = 0
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}

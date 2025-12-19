@@ -73,6 +73,7 @@ from brain.preferences.preference_store import PreferenceStore, ExplicitPreferen
 from brain.alerts.alert_importance import AlertImportanceResolver
 from brain.reflection.reflection_event import ReflectionEvent, ReflectionEventType
 from brain.reflection.reflection_engine import ReflectionEngine
+from brain.reflection.adjustment_engine import AdjustmentEngine
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -246,6 +247,8 @@ class MissionScheduler:
         self.preference_store = PreferenceStore(self.meaning_memory)
         self.alert_resolver = AlertImportanceResolver(self.preference_store)
         self.reflection_engine = ReflectionEngine(self.autonomy_ledger)
+        self.adjustment_engine = AdjustmentEngine(self.preference_store, self.autonomy_ledger)
+        self.last_adjustment_check = 0.0
         
         # ... (Services) ...
 
@@ -468,6 +471,13 @@ class MissionScheduler:
         }
         
         t_val = importance_score.get(self.preference_store.min_display_threshold.value, 20)
+        
+        # v16.1 Periodically run Adjustment Engine (every 60s)
+        if time.time() - self.last_adjustment_check > 60:
+            self.last_adjustment_check = time.time()
+            # Scan recent ledger entries (last 100)
+            entries = self.autonomy_ledger.get_entries()[-100:]
+            self.adjustment_engine.scan_ledger_for_proposals(entries)
         
         for s in candidates:
             # v15.1 Filtering Logic
