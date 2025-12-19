@@ -1,3 +1,21 @@
+# ==========================================
+# ⚠️ STABILITY ZONE — FEATURE FROZEN
+#
+# This file is part of Sentient OS core logic.
+# Feature-frozen as of v22.0.0.
+#
+# Allowed:
+# - Bug fixes
+# - Refactors without behavior change
+#
+# Forbidden:
+# - New features
+# - New decision logic
+# - New autonomy paths
+#
+# All changes must preserve behavior.
+# ==========================================
+
 import time
 from brain.autonomy.recovery_state import RecoveryState, RecoveryLevel, RecoveryTrigger
 from brain.autonomy.autonomy_ledger import AutonomyLedger, AutonomyDecision, DecisionType
