@@ -39,6 +39,8 @@ class SystemState(BaseModel):
     # v14.0
     contextual_history_count: int = 0
     last_pattern_detected: bool = False
+    # v14.1
+    last_pattern_explanation_available: bool = False
     
     pending_interrupt_requests: List[dict] = []
     interrupt_preference_summary: Dict[str, str] = {}

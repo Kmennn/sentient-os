@@ -33,3 +33,10 @@ def get_contextual_patterns(signal_title: str):
         "confidence": insight.confidence,
         "last_seen": insight.last_seen
     }
+
+@router.get("/contextual/patterns/{signal_title}/explanation")
+def get_pattern_explanation(signal_title: str):
+    explanation = mission_scheduler.pattern_narrator.get_explanation(signal_title)
+    if explanation:
+        return explanation.to_dict()
+    raise HTTPException(status_code=404, detail="Explanation not found (or not generated yet)")

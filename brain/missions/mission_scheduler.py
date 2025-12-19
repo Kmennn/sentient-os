@@ -66,6 +66,7 @@ from brain.contextual.contextual_search_engine import ContextualSearchEngine
 from brain.contextual.contextual_narrator import ContextualNarrator
 from brain.memory.contextual_memory import ContextualMemory
 from brain.memory.contextual_pattern_analyzer import ContextualPatternAnalyzer
+from brain.memory.pattern_narrator import PatternNarrator
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -234,6 +235,7 @@ class MissionScheduler:
         self.contextual_narrator = ContextualNarrator()
         self.contextual_memory = ContextualMemory()
         self.pattern_analyzer = ContextualPatternAnalyzer(self.contextual_memory)
+        self.pattern_narrator = PatternNarrator()
         
         # ... (Services) ...
 
@@ -853,6 +855,10 @@ class MissionScheduler:
                     
                     # Log Pattern
                     self._log_autonomy_decision(DecisionType.CONTEXTUAL_PATTERN_DETECTED, suggestion_id=suggestion.suggestion_id, reason=f"Trend: {insight.trend} Conf: {insight.confidence}", was_auto=False)
+                    
+                    # v14.1 Pattern Explanation
+                    explanation = self.pattern_narrator.explain(insight, sig.title)
+                    self._log_autonomy_decision(DecisionType.CONTEXTUAL_PATTERN_EXPLAINED, suggestion_id=suggestion.suggestion_id, reason=f"Explained: {explanation.trend_label}", was_auto=False)
                 
                 self.proactive_engine.active_suggestions.append(suggestion)
                 print(f"[EXTERNAL] Suggestion Created: {suggestion.message} (Vis: {suggestion.visibility_level.value})")

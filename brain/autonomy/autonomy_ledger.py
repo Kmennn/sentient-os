@@ -26,6 +26,7 @@ class DecisionType(Enum):
     CONTEXTUAL_MEMORY_RECORDED = "contextual_memory_recorded" # Keep for back-compat or rename? I'll alias or use new
     CONTEXTUAL_MEMORY_STORED = "contextual_memory_stored"
     CONTEXTUAL_PATTERN_DETECTED = "contextual_pattern_detected"
+    CONTEXTUAL_PATTERN_EXPLAINED = "contextual_pattern_explained"
 
 @dataclass
 class AutonomyDecision:
