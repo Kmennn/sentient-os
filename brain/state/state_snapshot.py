@@ -79,4 +79,11 @@ class SystemState(BaseModel):
     confidence_level: str = "MED"
     device_trust_score: float = 0.5
     device_list: List[dict] = [] # [{id, type, trust, active}]
-    # Future: Trust, Pending Proposals, etc.
+    
+    # S8: Health & Invariants
+    last_tick_duration_ms: Optional[int] = None
+    backpressure_active: bool = False
+    recovery_state: str = "NONE"
+    override_active: bool = False
+    startup_blocked: bool = False
+    invariant_violations_last_tick: int = 0

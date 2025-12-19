@@ -1,11 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert'; // Added for json.decode
 import 'package:hello_ai_os/services/state_stream_service.dart';
 import 'package:hello_ai_os/ui/widgets/glass_container.dart';
 import 'package:hello_ai_os/ui/timeline_page.dart';
 
-class SystemStatusPanel extends StatelessWidget {
+class SystemStatusPanel extends StatefulWidget {
   const SystemStatusPanel({super.key});
+
+  @override
+  State<SystemStatusPanel> createState() => _SystemStatusPanelState();
+}
+
+class _SystemStatusPanelState extends State<SystemStatusPanel> {
+  String _budgetStatus = "OK";
+  bool _isOverrideActive = false;
+  String _recoveryLevel = "NONE";
+  String? _interruptedActionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRuntimeState();
+    _checkRecoveryStatus();
+    _checkOverrideStatus();
+    _checkBudgetStatus();
+  }
+
+  Future<void> _checkOverrideStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://127.0.0.1:8000/autonomy/override/active'),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _isOverrideActive = data['active'] == true;
+        });
+      }
+    } catch (e) {
+      print("Error checking override: $e");
+    }
+  }
+
+  Future<void> _checkBudgetStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://127.0.0.1:8000/autonomy/budget'),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _budgetStatus = data['is_blocked'] == true ? "LIMITED" : "OK";
+        });
+      }
+    } catch (e) {
+      print("Error checking budget: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +109,102 @@ class SystemStatusPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // S8: Health Indicator
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  child: Text(
+                    () {
+                      final bp = data['backpressure_active'] == true;
+                      final rec = data['recovery_state'] ?? "NONE";
+                      final over = data['override_active'] == true;
+                      final start = data['startup_blocked'] == true;
+
+                      List<String> parts = [];
+                      if (!bp && rec == "NONE" && !over && !start) {
+                        return "Health: OK";
+                      }
+                      if (bp) parts.add("Backpressure");
+                      if (rec != "NONE") parts.add("Recovery: $rec");
+                      if (over) parts.add("Override");
+                      if (start) parts.add("Startup Blocked");
+                      return parts.join(" | ");
+                    }(),
+                    style: TextStyle(
+                      color:
+                          (data['backpressure_active'] == true ||
+                              (data['recovery_state'] != "NONE") ||
+                              data['startup_blocked'] == true)
+                          ? Colors.redAccent
+                          : (data['override_active'] == true
+                                ? Colors.amber
+                                : Colors.greenAccent),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+
+                if (_interruptedActionId != null)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.1),
+                      border: Border.all(color: Colors.redAccent),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "⚠️ ACTION INTERRUPTED",
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "Action ID: $_interruptedActionId",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => _resolveInterruption(
+                                _interruptedActionId!,
+                                "abort",
+                              ),
+                              child: const Text(
+                                "ABORT",
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () => _resolveInterruption(
+                                _interruptedActionId!,
+                                "retry",
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                              ),
+                              child: const Text(
+                                "RETRY",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 _SectionHeader(title: "ACTIVE CONTEXT", icon: Icons.radar),
                 const SizedBox(height: 10),
                 Row(
@@ -229,62 +377,69 @@ class SystemStatusPanel extends StatelessWidget {
                                   .toList(),
                         ),
                       ),
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
-                      ),
                       const SizedBox(height: 16),
                       _ControlRow(
                         label: "Safe Sandbox",
                         child: _ControlButton(
-                            label: "TEST PING",
-                            color: Colors.cyanAccent,
-                            onTap: () => _apiCall("/actions/demo_safe_ping/execute", method: "POST"),
+                          label: "TEST PING",
+                          color: Colors.cyanAccent,
+                          onTap: () => _apiCall(
+                            "/actions/demo_safe_ping/execute",
+                            method: "POST",
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
-                       _ControlRow(
+                      _ControlRow(
                         label: "Budget Status",
                         child: Text(
                           _budgetStatus,
                           style: TextStyle(
-                            color: _budgetStatus == "OK" ? Colors.greenAccent : Colors.orangeAccent,
+                            color: _budgetStatus == "OK"
+                                ? Colors.greenAccent
+                                : Colors.orangeAccent,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                       const SizedBox(height: 8),
-                       _ControlRow(
+                      _ControlRow(
                         label: "Recovery Mode",
                         child: Tooltip(
                           message: "System is cooling down to avoid errors",
                           child: Text(
                             _recoveryLevel,
                             style: TextStyle(
-                              color: _recoveryLevel == "NONE" ? Colors.greenAccent : Colors.redAccent,
+                              color: _recoveryLevel == "NONE"
+                                  ? Colors.greenAccent
+                                  : Colors.redAccent,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        ),
                       ),
                       const SizedBox(height: 8),
                       // Override Control
-                       _ControlRow(
+                      _ControlRow(
                         label: "Safety Override",
-                        child: _isOverrideActive 
-                          ? const Text("ACTIVE", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
-                          : GestureDetector(
-                              onTap: _requestOverride,
-                              child: const Text(
-                                "ENABLE", 
+                        child: _isOverrideActive
+                            ? const Text(
+                                "ACTIVE",
                                 style: TextStyle(
-                                  color: Colors.grey, 
-                                  decoration: TextDecoration.underline
-                                )
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : GestureDetector(
+                                onTap: _requestOverride,
+                                child: const Text(
+                                  "ENABLE",
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
                               ),
-                            ),
                       ),
                     ],
                   ),
@@ -297,17 +452,22 @@ class SystemStatusPanel extends StatelessWidget {
     );
   }
 
-  Future<void> _apiCall(String endpoint, {String method = "POST"}) async {
-    // Basic HTTP call - requires http package import
+  Future<void> _apiCall(
+    String endpoint, {
+    String method = "POST",
+    Object? body,
+  }) async {
     try {
-      // Assuming localhost:8000
       final uri = Uri.parse("http://127.0.0.1:8000$endpoint");
-      // Use http.post even if empty body
-      // We need to import http.
-      // Assuming it's available or I'll use a helper.
-      // I'll define a helper using pure dart:io or http if imported.
-      // Since I can't easily see imports for this file, I'll add `import 'package:http/http.dart' as http;` to the top.
-      await http.post(uri);
+      if (method == "POST") {
+        await http.post(
+          uri,
+          headers: {"Content-Type": "application/json"},
+          body: body != null ? json.encode(body) : null,
+        );
+      } else {
+        await http.get(uri);
+      }
     } catch (e) {
       print("API Error: $e");
     }
@@ -315,37 +475,36 @@ class SystemStatusPanel extends StatelessWidget {
 
   Future<void> _checkRuntimeState() async {
     try {
-      final response = await http.get(Uri.parse('http://127.0.0.1:8000/runtime/state'));
+      final response = await http.get(
+        Uri.parse('http://127.0.0.1:8000/runtime/state'),
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['action_phase'] == 'INTERRUPTED') {
-             _showInterruptionDialog(data['active_action_id']);
+          _showInterruptionDialog(data['active_action_id']);
         }
       }
     } catch (e) {
       // ignore
     }
   }
-  
+
   void _showInterruptionDialog(String actionId) {
-     // Check if already showing to avoid spam? 
-     // For simplicity, we'll just show a persistent bottom sheet or banner.
-     // But dialog is requested.
-     // Actually requirement says "SystemStatusPanel: Banner... Buttons".
-     // I'll add a boolean state `_isInterrupted` and show a banner in the build method.
-     setState(() {
-         _interruptedActionId = actionId;
-     });
+    if (_interruptedActionId != actionId) {
+      setState(() {
+        _interruptedActionId = actionId;
+      });
+    }
   }
-  
-  String? _interruptedActionId;
 
   Future<void> _resolveInterruption(String actionId, String resolution) async {
-      final endpoint = resolution == "retry" ? "/runtime/recover/$actionId" : "/runtime/abort/$actionId";
-      await _apiCall(endpoint, method: "POST");
-      setState(() {
-          _interruptedActionId = null;
-      });
+    final endpoint = resolution == "retry"
+        ? "/runtime/recover/$actionId"
+        : "/runtime/abort/$actionId";
+    await _apiCall(endpoint, method: "POST");
+    setState(() {
+      _interruptedActionId = null;
+    });
   }
 
   Future<void> _requestOverride() async {
@@ -356,47 +515,58 @@ class SystemStatusPanel extends StatelessWidget {
         content: const Text(
           "This bypasses all safety checks (Confidence, Budget, Recovery). "
           "It will result in an immediate trust penalty.\n\n"
-          "Are you sure?"
+          "Are you sure?",
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
           TextButton(
-             onPressed: () => Navigator.pop(context, true), 
-             child: const Text("FORCE EXECUTE", style: TextStyle(color: Colors.red))
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              "FORCE EXECUTE",
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      _apiCall("/autonomy/override", method: "POST", body: {
-        "scope": "ACTION",
-        "reason": "User Manual Force"
-      });
-      // Refresh status after delay
-      Future.delayed(const Duration(seconds: 1), _checkOverrideStatus);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Safety Override Enabled for 10 minutes.")),
+      _apiCall(
+        "/autonomy/override",
+        method: "POST",
+        body: {"scope": "ACTION", "reason": "User Manual Force"},
       );
+      Future.delayed(const Duration(seconds: 1), _checkOverrideStatus);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Safety Override Enabled for 10 minutes."),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _checkRecoveryStatus() async {
     try {
-      final response = await http.get(Uri.parse('http://127.0.0.1:8000/autonomy/recovery'));
+      final response = await http.get(
+        Uri.parse('http://127.0.0.1:8000/autonomy/recovery'),
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        setState(() {
-          _recoveryLevel = data['level'];
-        });
+        if (mounted) {
+          setState(() {
+            _recoveryLevel = data['level'] ?? "NONE";
+          });
+        }
       }
     } catch (e) {
       print("Error fetching recovery: $e");
     }
   }
-  
-  String _recoveryLevel = "NONE";
-
 
   Color _getTrustColor(double score) {
     if (score >= 0.7) return Colors.greenAccent;
@@ -456,82 +626,6 @@ class _ControlButton extends StatelessWidget {
             fontSize: 10,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SuggestionCard extends StatelessWidget {
-  final String id;
-  final String message;
-  final String type;
-  final Function(String) onResolve;
-
-  const _SuggestionCard({
-    required this.id,
-    required this.message,
-    required this.type,
-    required this.onResolve,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.cyanAccent.withOpacity(0.1),
-        border: Border.all(color: Colors.cyanAccent),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.cyanAccent.withOpacity(0.1), blurRadius: 10),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.lightbulb, color: Colors.cyanAccent, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                "SUGGESTION",
-                style: TextStyle(
-                  color: Colors.cyanAccent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => onResolve("DISMISS"),
-                child: const Text(
-                  "Dismiss",
-                  style: TextStyle(color: Colors.white54),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () => onResolve("ACCEPT"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyanAccent,
-                  foregroundColor: Colors.black,
-                ),
-                child: const Text("Accept"),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

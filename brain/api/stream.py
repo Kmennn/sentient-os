@@ -192,7 +192,15 @@ def get_current_state() -> SystemState:
         pending_adjustments_count=len([p for p in mission_scheduler.adjustment_engine.active_proposals.values() if p.status.value == "pending"]),
         # v17.0
         last_active_agent=mission_scheduler.current_agent_phase, # Simplified mapping
-        agent_phase=mission_scheduler.current_agent_phase
+        agent_phase=mission_scheduler.current_agent_phase,
+        
+        # S8: Health Metrics
+        last_tick_duration_ms=mission_scheduler._last_state_snapshot.get("last_tick_duration_ms"),
+        backpressure_active=mission_scheduler._last_state_snapshot.get("backpressure_active", False),
+        recovery_state=mission_scheduler._last_state_snapshot.get("recovery_state", "NONE"),
+        override_active=mission_scheduler._last_state_snapshot.get("override_active", False),
+        startup_blocked=mission_scheduler._last_state_snapshot.get("startup_blocked", False),
+        invariant_violations_last_tick=mission_scheduler._last_state_snapshot.get("invariant_violations_last_tick", 0)
     )
 
 @app.post("/interrupts/{request_id}/respond")

@@ -49,6 +49,7 @@ class TickContext:
         self.tick_id = tick_id
         self.executed_actions = set()
         self.ledger_entries = set()
+        self.invariant_violation_count = 0
 
 
 class BrainPhase(Enum):
@@ -203,6 +204,7 @@ class MissionScheduler:
         # S6: Tick Budget State
         self._last_tick_duration_ms: float = 0.0
         self._backpressure_active: bool = False
+        self._last_state_snapshot: dict = {}
         
         # Event Bus
         self.event_bus = event_bus
@@ -1150,17 +1152,29 @@ class MissionScheduler:
                     self._backpressure_active = True
                     self._log_autonomy_decision(DecisionType.BACKPRESSURE_ENABLED, reason=f"Tick exceeded {MAX_TICK_DURATION_MS}ms", was_auto=False)
         else:
-            # Clear backpressure if fast
-            if self._backpressure_active:
                 self._backpressure_active = False
                 self._log_autonomy_decision(DecisionType.BACKPRESSURE_CLEARED, reason=f"Tick recovered: {elapsed_ms:.2f}ms", was_auto=False)
 
+        # S8: Populate Health Snapshot (Before clearing context)
+        self._last_state_snapshot = {
+            "last_tick_duration_ms": int(elapsed_ms),
+            "backpressure_active": self._backpressure_active,
+            "recovery_state": self.recovery_manager.state.level.name if self.recovery_manager.state else "NONE",
+            "override_active": False, # Fixed later if method exists
+            "startup_blocked": self._startup_blocked,
+            "invariant_violations_last_tick": self._tick_context.invariant_violation_count
+        }
         
+        # Check override active properly
+        if self.override_manager.get_active_token():
+            self._last_state_snapshot["override_active"] = True
+
         self._tick_context = None # Clear Scope
         return self._cycle_decision_outcome if hasattr(self, '_cycle_decision_outcome') else None
 
     # S7: Invariant Checking
     def _log_invariant_violation(self, code: str):
+        self._tick_context.invariant_violation_count += 1
         self._pending_ledger_entries.append(AutonomyDecision(
             decision_id=str(uuid.uuid4()),
             decision_type=DecisionType.INVARIANT_VIOLATION,
