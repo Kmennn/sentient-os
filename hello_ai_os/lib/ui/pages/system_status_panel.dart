@@ -243,6 +243,17 @@ class SystemStatusPanel extends StatelessWidget {
                             onTap: () => _apiCall("/actions/demo_safe_ping/execute", method: "POST"),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                       _ControlRow(
+                        label: "Budget Status",
+                        child: Text(
+                          _budgetStatus,
+                          style: TextStyle(
+                            color: _budgetStatus == "OK" ? Colors.greenAccent : Colors.orangeAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

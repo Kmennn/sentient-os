@@ -84,6 +84,7 @@ from brain.timeline.system_confidence import ConfidenceEngine, SystemConfidence,
 from brain.actions.action_executor import ActionSandbox
 from brain.actions.action_capability import ActionCapability, ActionRisk
 from brain.actions.action_result import ActionStatus
+from brain.autonomy.autonomy_budget_manager import AutonomyBudgetManager
 from brain.proactive.proactive_suggestion import VisibilityLevel
 from brain.intents.interrupt_request import InterruptRequest, InterruptRequestStatus
 
@@ -273,6 +274,7 @@ class MissionScheduler:
         self.last_summary_time = 0
         self.last_confidence: SystemConfidence = None
         self.action_sandbox = ActionSandbox(self.autonomy_ledger, self)
+        self.budget_manager = AutonomyBudgetManager(self.autonomy_ledger)
         
         # ... (Services) ...
 
@@ -421,6 +423,24 @@ class MissionScheduler:
         return self.last_confidence
 
     def is_safe_to_execute(self, cap: ActionCapability) -> bool:
+        # 0. Budget Check (v21.0)
+        # Note: We check allowance but don't increment yet (ledger counts executed events).
+        if not self.budget_manager.check_allowance(self.device_trust_score):
+             usage = self.budget_manager.get_usage(self.device_trust_score)
+             print(f"[Scheduler] Blocked {cap.action_id}: Budget Exceeded. {usage.block_reason}")
+             
+             # Log Exceeded
+             decision = AutonomyDecision(
+                decision_id=str(uuid.uuid4()),
+                decision_type=DecisionType.AUTONOMY_BUDGET_EXCEEDED,
+                timestamp=time.time(),
+                action_id=cap.action_id,
+                reason=usage.block_reason,
+                device_id=self.active_device_id
+             )
+             self.autonomy_ledger.append(decision)
+             return False
+
         # 1. System Confidence
         conf = self.get_system_confidence()
         if conf.level == ConfidenceLevel.LOW:
@@ -447,6 +467,18 @@ class MissionScheduler:
         if status == ActionStatus.SUCCESS:
             print(f"[Scheduler] Action {action_id} Success. +Trust")
             self.update_device_trust(0.01) # Small increment
+            
+            # Log Budget Consumed
+            decision = AutonomyDecision(
+                decision_id=str(uuid.uuid4()),
+                decision_type=DecisionType.AUTONOMY_BUDGET_CONSUMED,
+                timestamp=time.time(),
+                action_id=action_id,
+                reason="Action Success consumes budget",
+                device_id=self.active_device_id
+             )
+            self.autonomy_ledger.append(decision)
+
         elif status == ActionStatus.FAILED:
             print(f"[Scheduler] Action {action_id} Failed. -Trust")
             self.update_device_trust(-0.05) # Penalty
