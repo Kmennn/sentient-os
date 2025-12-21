@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from brain.input.command_parser import CommandParser
+from brain.input.intent_parser import IntentParser
 from brain.missions.mission_scheduler import mission_scheduler
 
 router = APIRouter()
-parser = CommandParser()
+cmd_parser = CommandParser()
+intent_compiler = IntentParser()
 
 class CommandRequest(BaseModel):
     text: str
@@ -12,7 +14,15 @@ class CommandRequest(BaseModel):
 @router.post("/command")
 async def execute_command(cmd: CommandRequest):
     try:
-        parsed = parser.parse(cmd.text)
+        # H7: NL Compilation
+        compiled_text = intent_compiler.compile(cmd.text)
+        if not compiled_text:
+            return {
+                "status": "ERR", 
+                "message": "Ambiguous intent. Try '/focus 25', '/status', or '/stop'."
+            }
+
+        parsed = cmd_parser.parse(compiled_text)
         verb = parsed.verb
         args = parsed.args
 
@@ -33,8 +43,7 @@ async def execute_command(cmd: CommandRequest):
             if not args:
                  return {"status": "ERR", "message": "Mission description required."}
             desc = " ".join(args)
-            # Basic bridging
-            mission_scheduler._queue_mission({"task": desc}) # Assuming simple dict or string
+            mission_scheduler._queue_mission({"task": desc})
             return {"status": "OK", "message": f"Queued: {desc}"}
 
         elif verb == "stop":
@@ -42,18 +51,15 @@ async def execute_command(cmd: CommandRequest):
             return {"status": "OK", "message": "Stopped active mission."}
 
         elif verb == "panic":
-            # Simulate Soft Recovery trigger or clear queues
-            # mission_scheduler.recovery_manager.trigger... (if accessible)
-            # For H5 minimal: just log
             return {"status": "OK", "message": "Panic logged (Simulated)."}
             
         elif verb == "voice":
-            # Toggle?
             return {"status": "OK", "message": "Voice toggle not yet implemented."}
 
         return {"status": "OK", "message": f"Command '{verb}' parsed but not mapped."}
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Expected parsing errors
+        return {"status": "ERR", "message": str(e)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
