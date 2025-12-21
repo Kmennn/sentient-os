@@ -87,6 +87,7 @@ class DecisionType(Enum):
     INVARIANT_VIOLATION = "invariant_violation"
     CONTEXT_SIGNAL_RECEIVED = "context_signal_received"
     FEEDBACK_RECEIVED = "feedback_received"
+    ATTENTION_SUPPRESSED = "attention_suppressed"
 
 @dataclass
 class AutonomyDecision:

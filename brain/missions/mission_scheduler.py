@@ -184,6 +184,7 @@ class QueuedMission:
 from brain.output.voice_output_manager import VoiceOutputManager
 from brain.context.signals.app_context_provider import AppContextProvider
 from brain.context.signals.calendar_provider import CalendarProvider
+from brain.autonomy.trust_gate import TrustGate
 
 class MissionScheduler:
     """
@@ -219,6 +220,9 @@ class MissionScheduler:
         self.calendar_provider = CalendarProvider()
         self._last_app_context_data = None
         self._last_cal_context_data = None
+        
+        # H10: Trust Gate
+        self.trust_gate = TrustGate()
         
         # Event Bus
         self.event_bus = event_bus
@@ -1294,11 +1298,20 @@ class MissionScheduler:
             
         # v11.1 Proactive Insights
         # Feed insights to engine
-        # S6: Check Backpressure
+        # S6: Check Backpressure & H10: Annoyance Budget
         if self._backpressure_active:
              self._cycle_proactive_suggestions = []
+        elif not self.trust_gate.check_budget():
+             # H10: Budget Exceeded
+             # Log once per suppression? No, just silence or log decision.
+             # We'll log simplified decision
+             self._log_autonomy_decision(DecisionType.ATTENTION_SUPPRESSED, reason="Annoyance Budget Exceeded", was_auto=True)
+             self._cycle_proactive_suggestions = []
         else:
-             self._cycle_proactive_suggestions = self.proactive_engine.process_insights(self.ambient_observer.insights)
+             suggestions = self.proactive_engine.process_insights(self.ambient_observer.insights)
+             if suggestions:
+                 self.trust_gate.consume_budget()
+             self._cycle_proactive_suggestions = suggestions
 
     # PHASE GUARANTEE:
     # This method must not call later phases.

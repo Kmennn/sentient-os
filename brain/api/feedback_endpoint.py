@@ -26,6 +26,12 @@ async def submit_feedback(req: FeedbackRequest):
             was_auto=False
         )
         
+        # H10: Update Trust Gate
+        if fb_type == FeedbackType.POSITIVE:
+             mission_scheduler.trust_gate.record_feedback(req.target_id, True)
+        elif fb_type == FeedbackType.NEGATIVE:
+             mission_scheduler.trust_gate.record_feedback(req.target_id, False)
+        
         logger.info(f"[FEEDBACK] Received {req.type} for {req.target_id}")
         
         return {"status": "OK", "message": "Feedback recorded."}
