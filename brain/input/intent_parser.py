@@ -55,5 +55,18 @@ class IntentParser:
         if text.startswith("mission:") or text.startswith("task:"):
             return f"/mission {text.split(':', 1)[1].strip()}"
             
+        # 6. Action Macros (H8)
+        # "clean system"
+        if "clean system" in text or "cleanup" in text:
+            return "/macro clean_system"
+            
+        # "prepare for meeting"
+        if "meeting" in text and ("prep" in text or "prepare" in text):
+            return "/macro meeting_prep"
+            
+        # "wrap up work"
+        if "wrap up" in text:
+            return "/macro wrap_up"
+
         # Ambiguous / Unknown
         return None

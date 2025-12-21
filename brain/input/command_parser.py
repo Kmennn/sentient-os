@@ -10,7 +10,7 @@ class ParsedCommand:
 
 class CommandParser:
     WHITELIST = {
-        "focus", "status", "mission", "stop", "resume", "panic", "override", "voice"
+        "focus", "status", "mission", "stop", "resume", "panic", "override", "voice", "macro"
     }
 
     def parse(self, text: str) -> ParsedCommand:
