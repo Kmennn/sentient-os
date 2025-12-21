@@ -9,8 +9,9 @@ class TrustGate:
     Manages Annoyance Budget and Trust Thresholds.
     Prevents spam and suppresses distrusted actions.
     """
-    MAX_SUGGESTIONS_PER_HOUR = 3
-    MAX_SUGGESTIONS_PER_DAY = 10
+    MAX_SUGGESTIONS_PER_HOUR = 4 # Tuned for Beta
+    MAX_SUGGESTIONS_PER_DAY = 15 # Tuned for Beta
+    SUPPRESSION_THRESHOLD = -3
     
     def __init__(self, state_path="brain/autonomy/trust_state.json"):
         self.state_path = state_path
@@ -45,7 +46,7 @@ class TrustGate:
 
     def is_suppressed(self, target_id: str) -> bool:
         """Returns True if target has too much negative feedback."""
-        return self.feedback_score.get(target_id, 0) <= -3
+        return self.feedback_score.get(target_id, 0) <= self.SUPPRESSION_THRESHOLD
 
     def _save(self):
         try:
