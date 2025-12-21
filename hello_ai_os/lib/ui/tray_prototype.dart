@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 
-// Standalone Prototype for H3/H4/H5 (Tray Interface)
+// Standalone Prototype for H3-H9 (Tray Interface)
 class TrayPrototype extends StatefulWidget {
   const TrayPrototype({super.key});
 
@@ -11,7 +12,7 @@ class TrayPrototype extends StatefulWidget {
 }
 
 class _TrayPrototypeState extends State<TrayPrototype> {
-  // Mock Data (Real world would stream)
+  // Mock Data
   bool _shieldActive = false;
   bool _voiceActive = false;
   String _healthStatus = "OK";
@@ -22,6 +23,11 @@ class _TrayPrototypeState extends State<TrayPrototype> {
   final TextEditingController _cmdController = TextEditingController();
   bool _isSubmitting = false;
 
+  // H9: Feedback UI
+  bool _showFeedback = false;
+  String _lastActionId = "";
+  Timer? _feedbackTimer;
+
   @override
   void initState() {
     super.initState();
@@ -31,11 +37,11 @@ class _TrayPrototypeState extends State<TrayPrototype> {
   @override
   void dispose() {
     _cmdController.dispose();
+    _feedbackTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _fetchState() async {
-    // In prod, this would use the existing StreamService
     try {
       final res = await http.get(
         Uri.parse('http://127.0.0.1:8000/runtime/state'),
@@ -55,7 +61,6 @@ class _TrayPrototypeState extends State<TrayPrototype> {
     }
   }
 
-  // H5: Submit Command
   Future<void> _submitCommand(String text) async {
     if (text.trim().isEmpty) return;
     setState(() => _isSubmitting = true);
@@ -68,7 +73,6 @@ class _TrayPrototypeState extends State<TrayPrototype> {
       );
 
       if (res.statusCode == 200) {
-        // Success feedback
         final data = json.decode(res.body);
         _cmdController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -78,9 +82,11 @@ class _TrayPrototypeState extends State<TrayPrototype> {
             backgroundColor: Colors.green,
           ),
         );
-        _fetchState(); // Refresh
+        _fetchState();
+
+        // H9: Trigger Feedback Opportunity
+        _triggerFeedbackUI(text);
       } else {
-        // Error feedback
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error: ${res.body}"),
@@ -94,6 +100,39 @@ class _TrayPrototypeState extends State<TrayPrototype> {
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _triggerFeedbackUI(String actionId) {
+    if (mounted) {
+      setState(() {
+        _showFeedback = true;
+        _lastActionId = actionId;
+      });
+      _feedbackTimer?.cancel();
+      _feedbackTimer = Timer(const Duration(seconds: 5), () {
+        if (mounted) setState(() => _showFeedback = false);
+      });
+    }
+  }
+
+  Future<void> _sendFeedback(String type) async {
+    try {
+      await http.post(
+        Uri.parse("http://127.0.0.1:8000/input/feedback"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({"type": type, "target_id": _lastActionId}),
+      );
+      if (mounted) setState(() => _showFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Feedback Sent"),
+          duration: Duration(seconds: 1),
+          backgroundColor: Colors.blueAccent,
+        ),
+      );
+    } catch (e) {
+      print(e);
     }
   }
 
@@ -118,9 +157,9 @@ class _TrayPrototypeState extends State<TrayPrototype> {
       backgroundColor: Colors.transparent,
       body: Container(
         width: 300,
-        height: 550, // Slightly taller for input
+        height: 580,
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.9), // Darker for H5
+          color: Colors.black.withOpacity(0.9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white12),
         ),
@@ -130,10 +169,10 @@ class _TrayPrototypeState extends State<TrayPrototype> {
             const Divider(color: Colors.white10, height: 1),
             Expanded(flex: 2, child: _buildShieldControl()),
             Expanded(flex: 3, child: _buildFeed()),
-
-            // H5: Command Input
             const Divider(color: Colors.white10, height: 1),
-            _buildInputArea(),
+
+            // H9: Feedback Overlay or Input
+            _showFeedback ? _buildFeedbackArea() : _buildInputArea(),
 
             _buildStatusFooter(),
           ],
@@ -142,7 +181,46 @@ class _TrayPrototypeState extends State<TrayPrototype> {
     );
   }
 
-  // ... (Header and Shield same as before)
+  Widget _buildFeedbackArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: Colors.black45,
+      height: 48,
+      child: Row(
+        children: [
+          const Text(
+            "Was this helpful?",
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(
+              Icons.thumb_up,
+              color: Colors.greenAccent,
+              size: 18,
+            ),
+            onPressed: () => _sendFeedback("positive"),
+            tooltip: "Yes",
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.thumb_down,
+              color: Colors.redAccent,
+              size: 18,
+            ),
+            onPressed: () => _sendFeedback("negative"),
+            tooltip: "No",
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white30, size: 16),
+            onPressed: () => setState(() => _showFeedback = false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ... (Header same) ...
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -185,6 +263,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
     );
   }
 
+  // ... (Shield same) ...
   Widget _buildShieldControl() {
     return Center(
       child: GestureDetector(
@@ -234,6 +313,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
     );
   }
 
+  // ... (Feed same) ...
   Widget _buildFeed() {
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -301,11 +381,11 @@ class _TrayPrototypeState extends State<TrayPrototype> {
     );
   }
 
-  // H5: Input Area
   Widget _buildInputArea() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       color: Colors.black45,
+      height: 48,
       child: Row(
         children: [
           const Text(
@@ -326,7 +406,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
               ),
               decoration: const InputDecoration(
                 border: InputBorder.none,
-                hintText: "Enter command (/focus, /status)...",
+                hintText: "Enter command...",
                 hintStyle: TextStyle(color: Colors.white24),
                 isDense: true,
               ),

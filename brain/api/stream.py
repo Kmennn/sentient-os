@@ -22,6 +22,7 @@ from brain.api.reflection import router as reflection_router
 from brain.api.adjustments import router as adjustments_router
 from brain.api.sync import router as sync_router
 from brain.api.command_endpoint import router as command_router
+from brain.api.feedback_endpoint import router as feedback_router
 
 logger = logging.getLogger("API")
 
@@ -36,6 +37,7 @@ app.include_router(reflection_router)
 app.include_router(adjustments_router)
 app.include_router(sync_router)
 app.include_router(command_router)
+app.include_router(feedback_router)
 app.include_router(sync_router)
 app.include_router(timeline_router)
 app.include_router(confidence_router)
