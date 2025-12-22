@@ -39,6 +39,18 @@ async def set_mode(req: ModeRequest):
 async def get_mode():
     return {"mode": system_state.AUTONOMY_MODE}
 
+@router.get("/autonomy/trust")
+async def get_trust_score():
+    from brain.autonomy.trust_model import trust_model, TrustTier
+    
+    score = trust_model.score
+    tier = trust_model.get_tier()
+    
+    return {
+        "score": round(score, 2),
+        "tier": tier.name
+    }
+
 @router.post("/action/request")
 async def request_action(req: ActionRequest):
     """

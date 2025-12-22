@@ -11,7 +11,7 @@ class TeachModePanel extends StatefulWidget {
   });
 
   @override
-  _TeachModePanelState createState() => _TeachModePanelState();
+  State<TeachModePanel> createState() => _TeachModePanelState();
 }
 
 class _TeachModePanelState extends State<TeachModePanel> {

@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hello_ai_os/ui/user_management_panel.dart';
 
 void main() {
-  final owner = User(id: '1', name: 'Alice', role: UserRole.OWNER);
-  final operator = User(id: '2', name: 'Bob', role: UserRole.OPERATOR);
-  final observer = User(id: '3', name: 'Charlie', role: UserRole.OBSERVER);
+  final owner = User(id: '1', name: 'Alice', role: UserRole.owner);
+  final operator = User(id: '2', name: 'Bob', role: UserRole.operator);
+  final observer = User(id: '3', name: 'Charlie', role: UserRole.observer);
 
   final users = [owner, operator, observer];
 

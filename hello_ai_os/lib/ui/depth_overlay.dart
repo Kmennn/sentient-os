@@ -12,8 +12,8 @@ class DepthOverlay extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.red.withOpacity(0.3), // Far
-              Colors.blue.withOpacity(0.3), // Near
+              Colors.red.withValues(alpha: 0.3), // Far
+              Colors.blue.withValues(alpha: 0.3), // Near
             ],
           ),
         ),

@@ -23,6 +23,7 @@ from brain.actions.action_capability import ActionCapability, ActionRisk
 from brain.actions.action_result import ActionResult, ActionStatus
 from brain.actions.action_rollback import ActionRollback
 from brain.autonomy.autonomy_ledger import AutonomyLedger, AutonomyDecision, DecisionType
+from brain.runtime.execution_state import ExecutionState, ActionPhase
 
 class ActionSandbox:
     def __init__(self, ledger: AutonomyLedger, scheduler):
@@ -49,11 +50,18 @@ class ActionSandbox:
             requires_consent=True
         ))
 
+        self.register_capability(ActionCapability(
+            action_id="native_exec",
+            description="Executes a real system command (Whitelisted).",
+            risk_level=ActionRisk.HIGH,
+            reversible=False,
+            requires_consent=True # Always require consent for real ops
+        ))
+
     def register_capability(self, cap: ActionCapability):
         self._capabilities[cap.action_id] = cap
 
-from brain.runtime.execution_state import ExecutionState, ActionPhase
-import time
+
 
     def execute_action(self, action_id: str, requesting_agent: str = "User") -> ActionResult:
         cap = self._capabilities.get(action_id)
@@ -85,7 +93,18 @@ import time
                  print(f"[SANDBOX] PING! Executed by {requesting_agent}")
             elif action_id == "demo_risky_reset":
                  print(f"[SANDBOX] RESET! Executed by {requesting_agent}")
-            
+            elif action_id == "native_exec":
+                cmd = self._capabilities[action_id].params.get("command", "")
+                # Real Sandbox: Whitelist
+                allowed = ["notepad.exe", "calc.exe", "echo"]
+                if not any(cmd.startswith(a) for a in allowed) and not cmd.startswith("echo"):
+                     raise ValueError(f"Command '{cmd}' not in safety whitelist: {allowed}")
+                
+                import subprocess
+                # Run detached
+                subprocess.Popen(cmd, shell=True)
+                print(f"[SANDBOX] Launching Real Process: {cmd}")
+
             # Simulated processing
             if time.time() - start > 1.0:
                  raise TimeoutError("Action exceeded 1s execution limit")

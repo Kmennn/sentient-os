@@ -24,7 +24,6 @@ void main() {
   });
 
   testWidgets('Interactivity updates state', (WidgetTester tester) async {
-    DelayTolerance? newTolerance;
     bool? newPreemption;
 
     await tester.pumpWidget(
@@ -33,7 +32,7 @@ void main() {
           body: SchedulingPreferencesPanel(
             initialTolerance: DelayTolerance.medium,
             initialPreemption: false,
-            onToleranceChanged: (val) => newTolerance = val,
+            onToleranceChanged: (val) {},
             onPreemptionChanged: (val) => newPreemption = val,
           ),
         ),

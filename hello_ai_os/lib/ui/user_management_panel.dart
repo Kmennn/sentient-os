@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum UserRole { OWNER, OPERATOR, OBSERVER }
+enum UserRole { owner, operator, observer }
 
 class User {
   final String id;
@@ -22,7 +22,7 @@ class UserManagementPanel extends StatelessWidget {
     this.onRoleChanged,
   });
 
-  bool get canEdit => currentUser.role == UserRole.OWNER;
+  bool get canEdit => currentUser.role == UserRole.owner;
 
   @override
   Widget build(BuildContext context) {

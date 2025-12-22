@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class TimelineService {
   static final TimelineService _instance = TimelineService._internal();
@@ -58,7 +59,7 @@ class TimelineService {
         _confidenceController.add(data);
       }
     } catch (e) {
-      print("Confidence fetch error: $e");
+      debugPrint("Confidence fetch error: $e");
     }
   }
 
@@ -72,10 +73,10 @@ class TimelineService {
         _lastSummary = data;
         _summaryController.add(data);
       } else {
-        print("Summary fetch failed: ${response.statusCode}");
+        debugPrint("Summary fetch failed: ${response.statusCode}");
       }
     } catch (e) {
-      print("Summary fetch error: $e");
+      debugPrint("Summary fetch error: $e");
     }
   }
 
@@ -91,10 +92,10 @@ class TimelineService {
         _lastEvents = List<Map<String, dynamic>>.from(data);
         _controller.add(_lastEvents);
       } else {
-        print("Timeline fetch failed: ${response.statusCode}");
+        debugPrint("Timeline fetch failed: ${response.statusCode}");
       }
     } catch (e) {
-      print("Timeline error: $e");
+      debugPrint("Timeline error: $e");
     }
   }
 

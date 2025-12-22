@@ -24,6 +24,8 @@ from brain.api.sync import router as sync_router
 from brain.api.command_endpoint import router as command_router
 from brain.api.feedback_endpoint import router as feedback_router
 from brain.api.explain_endpoint import router as explain_router
+from brain.api.timeline import router as timeline_router
+from brain.api.confidence import router as confidence_router
 
 logger = logging.getLogger("API")
 
@@ -43,13 +45,20 @@ app.include_router(explain_router)
 app.include_router(sync_router)
 app.include_router(timeline_router)
 app.include_router(confidence_router)
-app.include_router(actions_router)
-app.include_router(budget_router)
-app.include_router(recovery_router)
-app.include_router(override_router)
-app.include_router(runtime_router)
+from brain.api.body_endpoint import router as body_router
+app.include_router(body_router)
+from brain.api.chat_endpoint import router as chat_router
+app.include_router(chat_router)
+
+# app.include_router(budget_router)
+# app.include_router(recovery_router)
+# app.include_router(override_router)
+# app.include_router(runtime_router)
 app.include_router(memory_router)
 app.include_router(preferences_router)
+from brain.api.routes import router as system_router
+app.include_router(system_router)
+
 
 def get_current_state() -> SystemState:
     # Build Snapshot from Scheduler
@@ -283,7 +292,7 @@ async def resolve_suggestion(suggestion_id: str, action: str):
     mission_scheduler.resolve_proactive_suggestion(suggestion_id, action.upper())
     return {"status": "resolved", "action": action}
 
-@app.websocket("/stream")
+@app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     await websocket.accept()
     

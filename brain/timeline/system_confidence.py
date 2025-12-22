@@ -36,7 +36,7 @@ class ConfidenceEngine:
         
         for e in events:
             txt = e.summary.lower()
-            typ = e.event_type.lower()
+            typ = str(e.event_type).lower() # Handle Enum or str
             
             if "violation" in typ:
                 has_violation = True

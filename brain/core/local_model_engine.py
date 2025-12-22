@@ -21,7 +21,7 @@ class LocalModelEngine:
         self.embedding_model = None
         
         # Lazy load embeddings to avoid startup delay
-        self._load_embedding_model_async()
+        # self._load_embedding_model_async() # Do NOT load on import, it blocks main thread.
 
     def _load_embedding_model_async(self):
         """

@@ -52,7 +52,7 @@ class SpatialOverlay extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTapUp: (details) {
           // Raycast logic would go here
-          print("Tap at ${details.localPosition}");
+          debugPrint("Tap at ${details.localPosition}");
         },
       ),
     );
@@ -63,7 +63,7 @@ class SpatialGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.green.withOpacity(0.3)
+      ..color = Colors.green.withValues(alpha: 0.3)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 

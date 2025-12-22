@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:flutter/foundation.dart';
 
 class SyncService {
   static final SyncService _instance = SyncService._internal();
@@ -27,7 +28,7 @@ class SyncService {
     if (_channel != null) return;
 
     try {
-      print("SyncService: Connecting...");
+      debugPrint("SyncService: Connecting...");
       final uri = Uri.parse('ws://127.0.0.1:8000/ws');
       _channel = WebSocketChannel.connect(uri);
 
@@ -51,24 +52,24 @@ class SyncService {
 
             _messageController.add(json);
           } catch (e) {
-            print("SyncService decode error: $e");
+            debugPrint("SyncService decode error: $e");
           }
         },
         onDone: () {
-          print("SyncService: Connection closed");
+          debugPrint("SyncService: Connection closed");
           _channel = null;
           _statusController.add(false);
           _scheduleReconnect();
         },
         onError: (error) {
-          print("SyncService error: $error");
+          debugPrint("SyncService error: $error");
           _channel = null;
           _statusController.add(false);
           _scheduleReconnect();
         },
       );
     } catch (e) {
-      print("SyncService connection initialization error: $e");
+      debugPrint("SyncService connection initialization error: $e");
       _statusController.add(false);
       _scheduleReconnect();
     }
@@ -78,7 +79,7 @@ class SyncService {
     if (_channel != null) return;
 
     const delay = Duration(seconds: 3);
-    print("SyncService: Reconnecting in 3s...");
+    debugPrint("SyncService: Reconnecting in 3s...");
     _reconnectTimer = Timer(delay, () {
       connect();
     });
@@ -90,7 +91,7 @@ class SyncService {
 
   void sendMessage(String text) {
     if (_channel == null) {
-      print("SyncService: Not connected, trying to connect...");
+      debugPrint("SyncService: Not connected, trying to connect...");
       connect();
     }
 
@@ -103,7 +104,7 @@ class SyncService {
     try {
       _channel?.sink.add(jsonEncode(data));
     } catch (e) {
-      print("SyncService send error: $e");
+      debugPrint("SyncService send error: $e");
     }
   }
 

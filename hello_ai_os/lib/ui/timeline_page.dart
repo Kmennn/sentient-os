@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hello_ai_os/services/timeline_service.dart';
-import 'package:hello_ai_os/ui/widgets/glass_container.dart'; // Reuse if available, otherwise card. Use standard Card for safety.
+// Reuse if available, otherwise card. Use standard Card for safety.
 
 class TimelinePage extends StatelessWidget {
   const TimelinePage({super.key});
@@ -91,8 +91,8 @@ class _SummarySection extends StatelessWidget {
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: riskColor.withOpacity(0.1),
-            border: Border.all(color: riskColor.withOpacity(0.5)),
+            color: riskColor.withValues(alpha: 0.1),
+            border: Border.all(color: riskColor.withValues(alpha: 0.5)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -174,7 +174,9 @@ class _ConfidenceFooter extends StatelessWidget {
             sinceDisplay =
                 "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
           }
-        } catch (e) {}
+        } catch (e) {
+          debugPrint("Date parse error: $e");
+        }
 
         return Row(
           children: [
@@ -252,8 +254,8 @@ class _EventCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: Colors.white.withValues(alpha: 0.05),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -262,7 +264,7 @@ class _EventCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 20),

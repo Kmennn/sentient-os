@@ -1446,9 +1446,6 @@ class MissionScheduler:
         self._check_invariants()
             
     def _check_startup_recovery(self):
-
-
-    def _check_startup_recovery(self):
         # S4: Check for Crash Interruption
         state = self.execution_store.get_state()
         if state.action_phase == ActionPhase.INTERRUPTED:

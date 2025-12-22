@@ -91,8 +91,8 @@ class MissionQueuePanel extends StatelessWidget {
 
   Widget _buildMissionTile(MissionEntry mission, BuildContext context) {
     Color cardColor = Colors.black26;
-    if (mission.isActive) cardColor = Colors.green.withOpacity(0.2);
-    if (mission.isPaused) cardColor = Colors.orange.withOpacity(0.2);
+    if (mission.isActive) cardColor = Colors.green.withValues(alpha: 0.2);
+    if (mission.isPaused) cardColor = Colors.orange.withValues(alpha: 0.2);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),

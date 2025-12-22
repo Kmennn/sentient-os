@@ -54,7 +54,7 @@ class _DiagnosticsPanelState extends State<DiagnosticsPanel>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.9),
+      backgroundColor: Colors.black.withValues(alpha: 0.9),
       appBar: AppBar(
         title: const Text("DIAGNOSTICS v1.5"),
         backgroundColor: Colors.transparent,

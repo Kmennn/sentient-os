@@ -20,7 +20,7 @@ class ObjectHandles extends StatelessWidget {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white),
               ),

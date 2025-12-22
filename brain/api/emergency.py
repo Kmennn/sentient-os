@@ -39,3 +39,12 @@ def acknowledge_emergency(emergency_id: str):
         
         return {"status": "acknowledged", "id": emergency_id}
     raise HTTPException(status_code=404, detail="Emergency not found or already acknowledged")
+
+@router.post("/emergency/stop")
+def trigger_emergency_stop():
+    """
+    Manual Emergency Stop triggered by User/UI.
+    Halts any active mission immediately.
+    """
+    mission_scheduler.preempt_active_mission("Manual Emergency Stop")
+    return {"status": "STOPPED", "message": "Emergency Stop Triggered"}

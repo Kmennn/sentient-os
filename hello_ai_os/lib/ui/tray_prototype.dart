@@ -16,8 +16,8 @@ class _TrayPrototypeState extends State<TrayPrototype> {
   bool _shieldActive = false;
   bool _voiceActive = false;
   String _healthStatus = "OK";
-  List<String> _timeline = ["System Init"];
-  List<Map<String, dynamic>> _suggestions = [];
+  final List<String> _timeline = ["System Init"];
+  final List<Map<String, dynamic>> _suggestions = [];
 
   // H5: Command Input
   final TextEditingController _cmdController = TextEditingController();
@@ -57,7 +57,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
         }
       }
     } catch (e) {
-      print("Tray Connect Error: $e");
+      debugPrint("Tray Connect Error: $e");
     }
   }
 
@@ -75,29 +75,35 @@ class _TrayPrototypeState extends State<TrayPrototype> {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         _cmdController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message'] ?? "Command Executed"),
-            duration: const Duration(seconds: 1),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(data['message'] ?? "Command Executed"),
+              duration: const Duration(seconds: 1),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
         _fetchState();
 
         // H9: Trigger Feedback Opportunity
         _triggerFeedbackUI(text);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: ${res.body}"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error: ${res.body}"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed: $e"), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed: $e"), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -124,15 +130,17 @@ class _TrayPrototypeState extends State<TrayPrototype> {
         body: json.encode({"type": type, "target_id": _lastActionId}),
       );
       if (mounted) setState(() => _showFeedback = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Feedback Sent"),
-          duration: Duration(seconds: 1),
-          backgroundColor: Colors.blueAccent,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Feedback Sent"),
+            duration: Duration(seconds: 1),
+            backgroundColor: Colors.blueAccent,
+          ),
+        );
+      }
     } catch (e) {
-      print(e);
+      debugPrint(e.toString());
     }
   }
 
@@ -159,7 +167,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
         width: 300,
         height: 580,
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.9),
+          color: Colors.black.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white12),
         ),
@@ -278,7 +286,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
             boxShadow: _shieldActive
                 ? [
                     BoxShadow(
-                      color: Colors.deepPurpleAccent.withOpacity(0.5),
+                      color: Colors.deepPurpleAccent.withValues(alpha: 0.5),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -350,7 +358,7 @@ class _TrayPrototypeState extends State<TrayPrototype> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

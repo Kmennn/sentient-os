@@ -123,7 +123,7 @@ class _ToolsPageState extends State<ToolsPage> {
                     icon: const Icon(Icons.play_arrow),
                     label: Text(_isLoading ? "Executing..." : "Run Tool"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.cyan.withOpacity(0.2),
+                      backgroundColor: Colors.cyan.withValues(alpha: 0.2),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 30,

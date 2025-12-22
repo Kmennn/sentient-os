@@ -39,7 +39,7 @@ class _SystemStatusPanelState extends State<SystemStatusPanel> {
         });
       }
     } catch (e) {
-      print("Error checking override: $e");
+      debugPrint("Error checking override: $e");
     }
   }
 
@@ -55,7 +55,7 @@ class _SystemStatusPanelState extends State<SystemStatusPanel> {
         });
       }
     } catch (e) {
-      print("Error checking budget: $e");
+      debugPrint("Error checking budget: $e");
     }
   }
 
@@ -150,7 +150,7 @@ class _SystemStatusPanelState extends State<SystemStatusPanel> {
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.1),
+                      color: Colors.redAccent.withValues(alpha: 0.1),
                       border: Border.all(color: Colors.redAccent),
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -469,7 +469,7 @@ class _SystemStatusPanelState extends State<SystemStatusPanel> {
         await http.get(uri);
       }
     } catch (e) {
-      print("API Error: $e");
+      debugPrint("API Error: $e");
     }
   }
 
@@ -502,9 +502,11 @@ class _SystemStatusPanelState extends State<SystemStatusPanel> {
         ? "/runtime/recover/$actionId"
         : "/runtime/abort/$actionId";
     await _apiCall(endpoint, method: "POST");
-    setState(() {
-      _interruptedActionId = null;
-    });
+    if (mounted) {
+      setState(() {
+        _interruptedActionId = null;
+      });
+    }
   }
 
   Future<void> _requestOverride() async {
@@ -564,7 +566,7 @@ class _SystemStatusPanelState extends State<SystemStatusPanel> {
         }
       }
     } catch (e) {
-      print("Error fetching recovery: $e");
+      debugPrint("Error fetching recovery: $e");
     }
   }
 
@@ -614,14 +616,16 @@ class _ControlButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.2) : Colors.transparent,
-          border: Border.all(color: isActive ? color : color.withOpacity(0.5)),
+          color: isActive ? color.withValues(alpha: 0.2) : Colors.transparent,
+          border: Border.all(
+            color: isActive ? color : color.withValues(alpha: 0.5),
+          ),
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? color : color.withOpacity(0.8),
+            color: isActive ? color : color.withValues(alpha: 0.8),
             fontWeight: FontWeight.bold,
             fontSize: 10,
           ),
@@ -696,7 +700,7 @@ class _StatusCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subValue,
-            style: TextStyle(color: color.withOpacity(0.8), fontSize: 10),
+            style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10),
           ),
         ],
       ),
@@ -728,10 +732,10 @@ class _DeviceTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
         border: isActive
-            ? Border.all(color: Colors.cyanAccent.withOpacity(0.5))
+            ? Border.all(color: Colors.cyanAccent.withValues(alpha: 0.5))
             : null,
       ),
       child: Row(

@@ -14,30 +14,30 @@ from brain.api.stream import app
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("HeadlessBrain")
 
-def run_scheduler_tick():
-    """Blocking loop for scheduler ticking"""
+@app.on_event("startup")
+async def start_scheduler():
+    asyncio.create_task(run_scheduler_loop())
+
+async def run_scheduler_loop():
+    """Async loop for scheduler ticking"""
+    logger.info("Scheduler Loop Started (Async)")
     try:
         while True:
-            # We must be careful if EventBus emission calls Async code from Sync context.
-            # Ideally scheduler should be async too or EventBus uses call_soon_threadsafe if loop exists.
-            # But here we are in a Thread.
-            # For v7.1 MVP: Simple Loop.
-            
+            # Run tick synchronously. 
+            # Note: This blocks the event loop for the duration of a tick.
+            # Ideally tick() should be fast.
+            # HACK: If tick is slow, API latencies increase. 
+            # But this fixes 'No Loop' event bus errors.
             action = mission_scheduler.tick()
             if action:
                 logger.info(f"Tick Action: {action}")
-            import time
-            time.sleep(1.0)
+            
+            await asyncio.sleep(0.1)
     except Exception as e:
         logger.error(f"Scheduler Loop Crash: {e}")
 
 def main():
     logger.info("Initializing Headless Brain v7.1 (w/ Stream)...")
-    
-    # Start Scheduler in separate thread so it doesn't block API
-    scheduler_thread = threading.Thread(target=run_scheduler_tick, daemon=True)
-    scheduler_thread.start()
-    
     logger.info("Starting Stream API on 0.0.0.0:8000...")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
 

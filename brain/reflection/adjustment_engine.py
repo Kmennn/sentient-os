@@ -37,7 +37,7 @@ class AdjustmentEngine:
         for d in decisions:
             if d.decision_type == DecisionType.REFLECTION_NEGATIVE:
                 # heuristic parse
-                txt = d.reason
+                txt = d.reason or ""
                 # Msg format: "Over-filtered? User searched for '{domain}'..."
                 # Msg format: "Over-noise? User dismissed '{domain}'..."
                 

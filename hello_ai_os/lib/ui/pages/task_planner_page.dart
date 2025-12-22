@@ -58,9 +58,11 @@ class _TaskPlannerPageState extends State<TaskPlannerPage> {
         _fetchMode();
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to set mode: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Failed to set mode: $e")));
+      }
     }
   }
 
@@ -96,7 +98,7 @@ class _TaskPlannerPageState extends State<TaskPlannerPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white12),
       ),
@@ -142,11 +144,11 @@ class _TaskPlannerPageState extends State<TaskPlannerPage> {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: isSelected
-            ? color.withOpacity(0.2)
+            ? color.withValues(alpha: 0.2)
             : Colors.transparent,
         foregroundColor: isSelected ? color : Colors.grey,
         side: BorderSide(
-          color: isSelected ? color : Colors.grey.withOpacity(0.3),
+          color: isSelected ? color : Colors.grey.withValues(alpha: 0.3),
         ),
       ),
       onPressed: () => _setMode(mode),

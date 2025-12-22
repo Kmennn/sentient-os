@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class VisionEngine:
     def __init__(self):
-        self.screenshot_url = "http://localhost:8001/vision/screenshot"
+        self.screenshot_url = "http://localhost:8000/vision/screenshot"
 
     async def _capture_data(self) -> Dict[str, Any]:
         async with httpx.AsyncClient() as client:

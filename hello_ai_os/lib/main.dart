@@ -12,11 +12,9 @@ import 'package:hello_ai_os/ui/pages/vision_page.dart';
 import 'package:hello_ai_os/ui/pages/tools_page.dart';
 import 'package:hello_ai_os/ui/pages/system_status_panel.dart';
 
-import 'package:hello_ai_os/services/state_stream_service.dart';
-
 void main() {
   // v7.1 State Stream Listener (Debug Only)
-  final streamService = StateStreamService();
+  // v7.1 State Stream Listener (Debug Only)
 
   runApp(const SentientOSApp());
 }
@@ -141,7 +139,7 @@ class _SentientShellState extends State<SentientShell> {
     });
 
     // 2. Body Polling (Stream simulation via polling /stream)
-    final telemetryTimer = Timer.periodic(const Duration(milliseconds: 1500), (
+    _telemetryTimer = Timer.periodic(const Duration(milliseconds: 1500), (
       timer,
     ) {
       _fetchBodyTelemetry();
@@ -159,7 +157,7 @@ class _SentientShellState extends State<SentientShell> {
     try {
       // Fast stream endpoint
       final r = await http
-          .get(Uri.parse('http://127.0.0.1:8001/stream'))
+          .get(Uri.parse('http://127.0.0.1:8000/stream'))
           .timeout(const Duration(milliseconds: 1000));
       if (r.statusCode == 200) {
         final data = jsonDecode(r.body);
@@ -174,7 +172,7 @@ class _SentientShellState extends State<SentientShell> {
 
       // Metadata (slower, call less often or just once? calling /status for full info)
       if (_osType == "Unknown") {
-        final r2 = await http.get(Uri.parse('http://127.0.0.1:8001/status'));
+        final r2 = await http.get(Uri.parse('http://127.0.0.1:8000/status'));
         final d2 = jsonDecode(r2.body);
         setState(() {
           _osType = d2['os_type'];
@@ -208,7 +206,7 @@ class _SentientShellState extends State<SentientShell> {
     try {
       // 1. Capture from Body
       final captureRes = await http.get(
-        Uri.parse('http://127.0.0.1:8001/screenshot'),
+        Uri.parse('http://127.0.0.1:8000/screenshot'),
       );
       if (captureRes.statusCode != 200) throw "Screenshot failed";
 
@@ -626,8 +624,8 @@ class _SentientShellState extends State<SentientShell> {
                                 )
                               : GlassContainer(
                                   color: isYou
-                                      ? Colors.cyan.withOpacity(0.2)
-                                      : Colors.black.withOpacity(0.3),
+                                      ? Colors.cyan.withValues(alpha: 0.2)
+                                      : Colors.black.withValues(alpha: 0.3),
                                   padding: const EdgeInsets.all(12),
                                   borderRadius: BorderRadius.circular(16),
                                   child: Column(
@@ -638,7 +636,9 @@ class _SentientShellState extends State<SentientShell> {
                                         m.sender,
                                         style: TextStyle(
                                           fontSize: 9,
-                                          color: Colors.white.withOpacity(0.4),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.4,
+                                          ),
                                         ),
                                       ),
                                       Text(m.text),
@@ -733,7 +733,9 @@ class _StatusDot extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 4)],
+          boxShadow: [
+            BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 4),
+          ],
         ),
       ),
     );

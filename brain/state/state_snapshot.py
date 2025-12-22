@@ -48,7 +48,7 @@ class SystemState(BaseModel):
     # v15.1
     last_alert_filtered: bool = False
     # v16.0
-    last_reflection_signal: str = None
+    last_reflection_signal: Optional[str] = None
     reflection_confidence: float = 0.0
     # v16.1
     pending_adjustments_count: int = 0

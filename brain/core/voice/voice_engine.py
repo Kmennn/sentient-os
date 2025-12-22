@@ -2,65 +2,83 @@
 import os
 import json
 import logging
-from vosk import Model, KaldiRecognizer
-import wave
 import io
+
+# Try importing vosk
+try:
+    from vosk import Model, KaldiRecognizer
+    VOSK_AVAILABLE = True
+except ImportError:
+    VOSK_AVAILABLE = False
+
+# Try importing speech_recognition
+try:
+    import speech_recognition as sr
+    SR_AVAILABLE = True
+except ImportError:
+    SR_AVAILABLE = False
 
 logger = logging.getLogger("voice_engine")
 
 class VoiceEngine:
     def __init__(self, model_path="brain/models/vosk-model-small-en-us-0.15"):
-        self.model = None
-        self.model_path = model_path
-        self._load_model()
-
-    def _load_model(self):
-        if os.path.exists(self.model_path):
-            logger.info(f"Loading Vosk model from {self.model_path}...")
+        self.mode = "none"
+        self.vosk_model = None
+        self.sr_recognizer = None
+        
+        # 1. Try Vosk
+        if VOSK_AVAILABLE and os.path.exists(model_path):
             try:
-                self.model = Model(self.model_path)
-                logger.info("Vosk model loaded.")
+                logger.info(f"Loading Vosk model from {model_path}...")
+                self.vosk_model = Model(model_path)
+                self.mode = "vosk"
+                logger.info("Vosk engine active.")
             except Exception as e:
-                logger.error(f"Failed to load Vosk model: {e}")
-        else:
-            logger.warning(f"Vosk model not found at {self.model_path}. Voice features disabled.")
+                logger.error(f"Vosk load failed: {e}")
+        
+        # 2. Fallback to SpeechRecognition (Google/Sphinx)
+        if self.mode == "none" and SR_AVAILABLE:
+            self.sr_recognizer = sr.Recognizer()
+            self.mode = "sr"
+            logger.info("SpeechRecognition engine active (Google/Sphinx).")
+            
+        if self.mode == "none":
+            logger.warning("No voice engine available (Vosk model missing & SpeechRecognition not installed).")
 
     async def transcribe(self, audio_data: bytes) -> dict:
         """
         Transcribe WAV bytes.
         Returns: {"text": "...", "confidence": 1.0}
         """
-        if not self.model:
-            return {"text": "", "error": "Model not loaded"}
+        if self.mode == "none":
+            return {"text": "", "error": "No engine"}
 
-        # Vosk expects 16kHz mono PCM usually.
-        # We assume the UI sends correct format or we might need headers.
-        # If raw bytes, we need to know sample rate.
-        # KaldiRecognizer(model, sample_rate)
-        
-        try:
-             # Try to read as Wav to get params?
-             # Or assume raw 16k mono?
-             # Let's try to parse wav header if present
-            with io.BytesIO(audio_data) as wav_file:
-                with wave.open(wav_file, "rb") as wf:
-                    if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-                        # Simplification: Accept it anyway for now or log warning
-                        pass
-                    
-                    rec = KaldiRecognizer(self.model, wf.getframerate())
-                    rec.AcceptWaveform(audio_data)
-                    res = json.loads(rec.FinalResult())
-                    return {"text": res.get("text", "")}
-        except Exception as e:
-            # Fallback: assume raw 16000?
+        # Vosk
+        if self.mode == "vosk":
             try:
-                rec = KaldiRecognizer(self.model, 16000)
+                rec = KaldiRecognizer(self.vosk_model, 16000)
                 rec.AcceptWaveform(audio_data)
                 res = json.loads(rec.FinalResult())
                 return {"text": res.get("text", "")}
-            except Exception as e2:
-                 logger.error(f"Transcription error: {e2}")
-                 return {"text": "", "error": str(e2)}
+            except Exception as e:
+                logger.error(f"Vosk error: {e}")
+                return {"text": "", "error": str(e)}
+
+        # SpeechRecognition
+        if self.mode == "sr":
+            try:
+                # Convert bytes to AudioFile-like
+                import wave
+                with io.BytesIO(audio_data) as wav_io:
+                    with sr.AudioFile(wav_io) as source:
+                        audio = self.sr_recognizer.record(source)
+                        # Recognize
+                        text = self.sr_recognizer.recognize_google(audio)
+                        return {"text": text}
+            except sr.UnknownValueError:
+                return {"text": ""}
+            except Exception as e:
+                logger.error(f"SR error: {e}")
+                return {"text": "", "error": str(e)}
 
 voice_engine = VoiceEngine()

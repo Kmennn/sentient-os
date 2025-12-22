@@ -30,7 +30,7 @@ class _VisionPageState extends State<VisionPage> {
     try {
       // 1. Get Screenshot from Body for Preview
       final imgResp = await http.get(
-        Uri.parse("http://localhost:8001/vision/screenshot"),
+        Uri.parse("http://localhost:8000/vision/screenshot"),
       );
       if (imgResp.statusCode == 200) {
         final data = json.decode(imgResp.body);
@@ -176,7 +176,9 @@ class _VisionPageState extends State<VisionPage> {
                               .map(
                                 (t) => Chip(
                                   label: Text(t.toString()),
-                                  backgroundColor: Colors.cyan.withOpacity(0.2),
+                                  backgroundColor: Colors.cyan.withValues(
+                                    alpha: 0.2,
+                                  ),
                                   labelStyle: const TextStyle(
                                     color: Colors.white,
                                   ),
