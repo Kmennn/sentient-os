@@ -11,6 +11,7 @@ import 'package:hello_ai_os/ui/pages/task_planner_page.dart';
 import 'package:hello_ai_os/ui/pages/vision_page.dart';
 import 'package:hello_ai_os/ui/pages/tools_page.dart';
 import 'package:hello_ai_os/ui/pages/system_status_panel.dart';
+import 'package:hello_ai_os/ui/robot_control_panel.dart'; // Added
 
 void main() {
   // v7.1 State Stream Listener (Debug Only)
@@ -527,6 +528,20 @@ class _SentientShellState extends State<SentientShell> {
                                 ),
                               ),
                               tooltip: "Transparency Panel",
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.precision_manufacturing_outlined,
+                                size: 20,
+                                color: Colors.orangeAccent,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RobotControlPanel(),
+                                ),
+                              ),
+                              tooltip: "Robot Control",
                             ),
                             GestureDetector(
                               onLongPress: _toggleAutoMode,

@@ -17,7 +17,7 @@ class PresenceRegistry:
     def unregister(self, client_id: str):
         if client_id in self._clients:
             client = self._clients.pop(client_id)
-            logger.info(f"Client Disconnected: {client_id} ({client_type})")
+            logger.info(f"Client Disconnected: {client_id} ({client.client_type})")
 
     def get_client(self, client_id: str) -> Optional[ClientIdentity]:
         return self._clients.get(client_id)

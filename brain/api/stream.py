@@ -8,6 +8,7 @@ from brain.autonomy.autonomy_ledger import DecisionType
 from brain.memory.meaning_memory import InteractionType
 import asyncio
 import logging
+import json
 
 from brain.presence.presence_registry import presence_registry
 from brain.presence.client import ClientType
@@ -308,9 +309,6 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     logger.info(f"Client {client_id} connected via Stream.")
     event_bus.emit(EventType.CLIENT_CONNECTED, {"client_id": client_id})
     
-    # Send initial state
-    await websocket.send_json(get_current_state().model_dump())
-    
     # Subscribe to Event Bus to push updates
     queue = asyncio.Queue()
     
@@ -323,15 +321,71 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     event_bus.subscribe_async(EventType.MISSION_COMPLETED, event_handler)
     event_bus.subscribe_async(EventType.CLIENT_CONNECTED, event_handler)
     event_bus.subscribe_async(EventType.CLIENT_DISCONNECTED, event_handler)
+    event_bus.subscribe_async(EventType.ACTION_CONFIRMATION_REQUEST, event_handler) # v1.9 Logic
     
+    # Send initial state
+    await websocket.send_json(get_current_state().model_dump())
+
+    # Bi-directional Loops
+    async def sender_loop():
+        try:
+            while True:
+                # Wait for event
+                event_data = await queue.get()
+                
+                # If explicit message (like confirmation request), send payload directly
+                if isinstance(event_data, dict) and event_data.get("type") == "action.confirmation":
+                     ids = event_data.get("payload", {}).get("action_id")
+                     print(f"DEBUG: Stream forwarding confirmation {ids} to WS")
+                     await websocket.send_json(event_data)
+                     # Also send updated state as overlay?
+                     # Ideally we just send the message. Client handles logic.
+                     continue
+                
+                # On generic event, generate FRESH state and send.
+                state = get_current_state()
+                await websocket.send_json(state.model_dump())
+        except Exception as e:
+            logger.error(f"Sender Loop Error: {e}")
+            raise e
+
+    async def receiver_loop():
+        from brain.core.llm_service import llm_service
+        try:
+            while True:
+                data = await websocket.receive_text()
+                try:
+                    msg = json.loads(data)
+                    msg_type = msg.get("type")
+                    
+                    if msg_type == "action.confirm":
+                        logger.info(f"Received Action Confirmation: {msg}")
+                        payload = msg.get("payload", {})
+                        action_id = payload.get("action_id")
+                        
+                        # Execute
+                        logger.info(f"Confirming Action ID: {action_id}")
+                        result = await llm_service.confirm_action(action_id)
+                        
+                        # Notify directly via queue? Or just rely on return?
+                        # Let's send a notification back via WS logic
+                        notification = {
+                            "type": "notification", 
+                            "content": f"Status: {result}"
+                        }
+                        # We can put directly on queue or send? 
+                        # Putting on queue ensures thread safety with websocket object
+                        await queue.put(notification)
+                        
+                except json.JSONDecodeError:
+                    pass
+        except Exception as e:
+            logger.error(f"Receiver Loop Error: {e}")
+            raise e
+
     try:
-        while True:
-            # Wait for event
-            event_data = await queue.get()
-            
-            # On event, generate FRESH state and send.
-            state = get_current_state()
-            await websocket.send_json(state.model_dump())
+        # Run both loops
+        await asyncio.gather(sender_loop(), receiver_loop())
             
     except WebSocketDisconnect:
         logger.info(f"Client {client_id} disconnected.")

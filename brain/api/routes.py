@@ -96,7 +96,7 @@ async def run_agent_task(query: str):
     Directly trigger the TaskAgent.
     """
     # Import locally to avoid circular import issues
-    from core.llm_service import llm_service
+    from brain.core.llm_service import llm_service
     
     # Force TASK intent
     # This is a bit of a hack re-using generate_response logic, 

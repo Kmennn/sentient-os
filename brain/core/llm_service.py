@@ -261,13 +261,16 @@ class LLMService:
             "plan_id": plan_id
         }
         
-        # Broadcast confirmation request
-        from api.ws_handlers import manager
+        # Broadcast confirmation request via Event Bus
+        # This decouples LLMService from WebSocket implementation details
+        from brain.events.event_bus import event_bus
+        from brain.events.event_types import EventType
+        
         summary = f"Allow Step {idx+1}/{len(plan)}: {action.get('action')} {action.get('params')}?"
         if is_elevated:
             summary = "[ELEVATED] " + summary
             
-        await manager.broadcast_json({
+        payload = {
             "type": "action.confirmation",
             "payload": {
                 "action_id": action_id,
@@ -276,9 +279,12 @@ class LLMService:
                 "execution_data": action,
                 "sequence_id": plan_id
             }
-        })
+        }
+        event_bus.emit(EventType.ACTION_CONFIRMATION_REQUEST, payload)
+        print(f"DEBUG: Emitted ACTION_CONFIRMATION_REQUEST for {action_id} (Plan: {plan_id})")
 
     async def confirm_action(self, action_id: str):
+        print(f"DEBUG: confirm_action ENTER for {action_id}")
         """
         Called when user confirms an action via UI.
         """

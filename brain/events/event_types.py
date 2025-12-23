@@ -13,6 +13,8 @@ class EventType(StrEnum):
     
     TRUST_UPDATED = auto()
     
+    ACTION_CONFIRMATION_REQUEST = auto()
+    
     CLIENT_CONNECTED = auto()
     CLIENT_DISCONNECTED = auto()
     

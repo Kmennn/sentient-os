@@ -37,10 +37,14 @@ class TaskAgent(BaseAgent):
         try:
             # Extract JSON if wrapped in markdown code blocks
             if "```" in response_text:
-                response_text = response_text.split("```")[1]
+                parts = response_text.split("```")
+                # Usually logic inside split
+                if len(parts) > 1:
+                    response_text = parts[1]
                 if response_text.startswith("json"):
                     response_text = response_text[4:]
             
+            response_text = response_text.strip()
             plan = json.loads(response_text)
             if isinstance(plan, list):
                 return plan
