@@ -31,6 +31,15 @@ from brain.api.confidence import router as confidence_router
 logger = logging.getLogger("API")
 
 app = FastAPI()
+
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(autonomy_router)
 app.include_router(external_signals_router)
 app.include_router(emergency_router)

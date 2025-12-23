@@ -255,66 +255,138 @@ class _SentientShellState extends State<SentientShell> {
 
   Future<void> _showConfirmationDialog(Map<String, dynamic> payload) async {
     final intent = payload['intent'] ?? "Unknown Action";
-    final summary = payload['summary'] ?? "Allow this action?";
+    final summary = payload['summary'] ?? "System requests approval.";
     final actionId = payload['action_id'];
 
-    return showDialog<void>(
+    return showGeneralDialog<void>(
       context: context,
-      barrierDismissible: false, // User must choose
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text(
-            "⚠️ Authorization Required",
-            style: TextStyle(color: Colors.amberAccent),
-          ),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                Text(summary, style: const TextStyle(color: Colors.white)),
-                const SizedBox(height: 8),
-                Text(
-                  "Intent: $intent",
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text(
-                'DENY',
-                style: TextStyle(color: Colors.redAccent),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _addMessage("SYSTEM", "Action '$intent' Denied.", true);
-                // Ideally send rejection back to Brain
-              },
-            ),
-            TextButton(
-              child: const Text(
-                'ALLOW & EXECUTE',
-                style: TextStyle(
-                  color: Colors.greenAccent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _addMessage("SYSTEM", "Authorizing...", true);
+      barrierDismissible: false,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (ctx, anim1, anim2) {
+        return Container(); // unused
+      },
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        return ScaleTransition(
+          scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+          child: FadeTransition(
+            opacity: anim1,
+            child: Center(
+              child: Material(
+                color: const Color(0xFF252525),
+                borderRadius: BorderRadius.circular(24),
+                elevation: 12,
+                child: Container(
+                  width: 320,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.verified_user_outlined,
+                            color: Colors.cyanAccent.withOpacity(0.8),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Review Action",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
 
-                // Send Confirmation
-                syncService.sendMessageJson({
-                  "type": "action.confirm",
-                  "payload": {
-                    "action_id": actionId,
-                    "authorized_by": "user_ui",
-                  },
-                });
-              },
+                      // Content
+                      Text(
+                        summary,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Text(
+                          "Intent: $intent",
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
+                            fontFamily: 'Monospace',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Actions
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              _addMessage("SYSTEM", "Declined: $intent", true);
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white54,
+                            ),
+                            child: const Text("Cancel"),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              _addMessage("SYSTEM", "Authorizing...", true);
+                              syncService.sendMessageJson({
+                                "type": "action.confirm",
+                                "payload": {
+                                  "action_id": actionId,
+                                  "authorized_by": "user_ui",
+                                },
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.cyanAccent.withOpacity(
+                                0.1,
+                              ),
+                              foregroundColor: Colors.cyanAccent,
+                              elevation: 0,
+                              side: BorderSide(
+                                color: Colors.cyanAccent.withOpacity(0.3),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text("Approve"),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ],
+          ),
         );
       },
     );
