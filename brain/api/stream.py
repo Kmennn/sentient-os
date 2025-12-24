@@ -354,9 +354,13 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
                 # On generic event, generate FRESH state and send.
                 state = get_current_state()
                 await websocket.send_json(state.model_dump())
+        except (WebSocketDisconnect, RuntimeError) as e:
+            # Connection likely closed
+            logger.debug(f"Sender loop ended: {e}")
         except Exception as e:
             logger.error(f"Sender Loop Error: {e}")
-            raise e
+            # Don't re-raise, just exit loop
+            pass
 
     async def receiver_loop():
         from brain.core.llm_service import llm_service

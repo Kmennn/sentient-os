@@ -38,8 +38,8 @@ async def run_scheduler_loop():
 
 def main():
     logger.info("Initializing Headless Brain v7.1 (w/ Stream)...")
-    logger.info("Starting Stream API on 0.0.0.0:8000...")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
+    logger.info("Starting Stream API on 127.0.0.1:8000...")
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
 
 if __name__ == "__main__":
     main()

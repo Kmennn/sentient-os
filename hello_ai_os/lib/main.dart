@@ -229,7 +229,7 @@ class _SentientShellState extends State<SentientShell> {
 
       // 3. Report
       final desc = analysis['description'];
-      final tags = (analysis['objects'] as List).join(", ");
+      final tags = (analysis['objects'] as List?)?.join(", ") ?? "No tags";
 
       _addMessage("VISION", "$desc\n[TAGS]: $tags", false);
     } catch (e) {
@@ -272,120 +272,7 @@ class _SentientShellState extends State<SentientShell> {
           scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
           child: FadeTransition(
             opacity: anim1,
-            child: Center(
-              child: Material(
-                color: const Color(0xFF252525),
-                borderRadius: BorderRadius.circular(24),
-                elevation: 12,
-                child: Container(
-                  width: 320,
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.verified_user_outlined,
-                            color: Colors.cyanAccent.withOpacity(0.8),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            "Review Action",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Content
-                      Text(
-                        summary,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: Text(
-                          "Intent: $intent",
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 11,
-                            fontFamily: 'Monospace',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Actions
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              _addMessage("SYSTEM", "Declined: $intent", true);
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.white54,
-                            ),
-                            child: const Text("Cancel"),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              _addMessage("SYSTEM", "Authorizing...", true);
-                              syncService.sendMessageJson({
-                                "type": "action.confirm",
-                                "payload": {
-                                  "action_id": actionId,
-                                  "authorized_by": "user_ui",
-                                },
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.cyanAccent.withOpacity(
-                                0.1,
-                              ),
-                              foregroundColor: Colors.cyanAccent,
-                              elevation: 0,
-                              side: BorderSide(
-                                color: Colors.cyanAccent.withOpacity(0.3),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text("Approve"),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            child: _ConfirmationDialog(payload: payload),
           ),
         );
       },
@@ -454,7 +341,7 @@ class _SentientShellState extends State<SentientShell> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          "SENTIENT v1.6 (OFFLINE)",
+                          "SENTIENT v1.7 (DEBUG)",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             letterSpacing: 2,
@@ -573,20 +460,50 @@ class _SentientShellState extends State<SentientShell> {
                               ),
                               tooltip: "Vision Pipeline",
                             ),
+
                             IconButton(
                               icon: const Icon(
-                                Icons.build_circle_outlined,
+                                Icons.settings_system_daydream,
                                 size: 20,
                                 color: Colors.white70,
                               ),
                               onPressed: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const ToolsPage(),
+                                  builder: (_) => const ModelManagerPage(),
                                 ),
                               ),
-                              tooltip: "Tools Framework",
+                              tooltip: "Model Manager",
                             ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.task_alt,
+                                size: 20,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const TaskPlannerPage(),
+                                ),
+                              ),
+                              tooltip: "Task Planner",
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility_outlined,
+                                size: 20,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const VisionPage(),
+                                ),
+                              ),
+                              tooltip: "Vision Pipeline",
+                            ),
+
                             IconButton(
                               icon: const Icon(
                                 Icons.stream,
@@ -600,6 +517,20 @@ class _SentientShellState extends State<SentientShell> {
                                 ),
                               ),
                               tooltip: "Transparency Panel",
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.build_circle_outlined,
+                                size: 20,
+                                color: Colors.white70,
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ToolsPage(),
+                                ),
+                              ),
+                              tooltip: "Tools Framework",
                             ),
                             IconButton(
                               icon: const Icon(
@@ -872,6 +803,258 @@ class _AnimatedStat extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+// v1.9: Action Confirmation Dialog with Micro-Feedback
+class _ConfirmationDialog extends StatefulWidget {
+  final Map<String, dynamic> payload;
+
+  const _ConfirmationDialog({required this.payload});
+
+  @override
+  State<_ConfirmationDialog> createState() => _ConfirmationDialogState();
+}
+
+enum _DialogState { idle, executing, success, locked }
+
+class _ConfirmationDialogState extends State<_ConfirmationDialog>
+    with SingleTickerProviderStateMixin {
+  _DialogState _state = _DialogState.idle;
+  StreamSubscription? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = syncService.messages.listen((msg) {
+      if (!mounted) return;
+
+      // Logic: Close the loop based on backend notification
+      if (msg['type'] == 'notification' &&
+          (msg['content'] ?? "").toString().contains("Status: Executed")) {
+        setState(() => _state = _DialogState.success);
+        // Auto-dismiss
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (mounted && Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        });
+      }
+
+      if (msg['type'] == 'safety.violation') {
+        setState(() => _state = _DialogState.locked);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  void _approve() {
+    setState(() => _state = _DialogState.executing);
+    syncService.sendMessageJson({
+      "type": "action.confirm",
+      "payload": {
+        "action_id": widget.payload['action_id'],
+        "authorized_by": "user_ui",
+      },
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final intent = widget.payload['intent'] ?? "Unknown Action";
+    final summary = widget.payload['summary'] ?? "System requests approval.";
+
+    return Center(
+      child: Material(
+        color: const Color(0xFF252525),
+        borderRadius: BorderRadius.circular(24),
+        elevation: 12,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: 320,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            border: _state == _DialogState.success
+                ? Border.all(color: Colors.greenAccent, width: 2)
+                : (_state == _DialogState.locked
+                      ? Border.all(color: Colors.amber, width: 2)
+                      : null),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(
+                    _state == _DialogState.success
+                        ? Icons.check_circle
+                        : (_state == _DialogState.locked
+                              ? Icons.warning_amber_rounded
+                              : Icons.verified_user_outlined),
+                    color: _state == _DialogState.success
+                        ? Colors.greenAccent
+                        : (_state == _DialogState.locked
+                              ? Colors.amber
+                              : Colors.cyanAccent.withOpacity(0.8)),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _state == _DialogState.success
+                        ? "Action Completed"
+                        : (_state == _DialogState.locked
+                              ? "Paused"
+                              : "Review Action"),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Content
+              if (_state == _DialogState.idle ||
+                  _state == _DialogState.executing)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      summary,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Text(
+                        "Intent: $intent",
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 11,
+                          fontFamily: 'Monospace',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+              if (_state == _DialogState.success)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                  child: Text(
+                    "System successfully executed the action.",
+                    style: TextStyle(color: Colors.white60, fontSize: 13),
+                  ),
+                ),
+
+              if (_state == _DialogState.locked)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                  child: Text(
+                    "Human interaction detected during execution. System paused for safety.",
+                    style: TextStyle(color: Colors.white60, fontSize: 13),
+                  ),
+                ),
+
+              const SizedBox(height: 24),
+
+              // Actions
+              if (_state == _DialogState.idle)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        // Optional: Send Cancel signal
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white54,
+                      ),
+                      child: const Text("Cancel"),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _approve,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.cyanAccent.withOpacity(0.1),
+                        foregroundColor: Colors.cyanAccent,
+                        elevation: 0,
+                        side: BorderSide(
+                          color: Colors.cyanAccent.withOpacity(0.3),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text("Approve"),
+                    ),
+                  ],
+                ),
+
+              if (_state == _DialogState.executing)
+                Row(
+                  children: const [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.cyanAccent,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      "Executing...",
+                      style: TextStyle(
+                        color: Colors.cyanAccent,
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+
+              if (_state == _DialogState.locked)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text("Dismiss"),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
