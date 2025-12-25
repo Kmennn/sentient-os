@@ -518,6 +518,36 @@ class _SentientShellState extends State<SentientShell> {
                               ),
                               tooltip: "Transparency Panel",
                             ),
+                            // DEBUG: Cancel Test
+                            IconButton(
+                              icon: const Icon(
+                                Icons.cancel,
+                                color: Colors.white60,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                _showConfirmationDialog({
+                                  "intent": "Cancel Test",
+                                  "summary": "Test cancel before execution.",
+                                  "action_id": "test-cancel",
+                                });
+                              },
+                            ),
+                            // DEBUG: Abort Test
+                            IconButton(
+                              icon: const Icon(
+                                Icons.warning_amber,
+                                color: Colors.amber,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                _showConfirmationDialog({
+                                  "intent": "Abort Test",
+                                  "summary": "Test abort during execution.",
+                                  "action_id": "test-abort",
+                                });
+                              },
+                            ),
                             IconButton(
                               icon: const Icon(
                                 Icons.build_circle_outlined,
@@ -817,7 +847,15 @@ class _ConfirmationDialog extends StatefulWidget {
   State<_ConfirmationDialog> createState() => _ConfirmationDialogState();
 }
 
-enum _DialogState { idle, executing, success, locked }
+enum _DialogState {
+  idle,
+  executing,
+  success,
+  locked,
+  cancelled,
+  aborting,
+  aborted,
+}
 
 class _ConfirmationDialogState extends State<_ConfirmationDialog>
     with SingleTickerProviderStateMixin {
@@ -865,6 +903,32 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
     });
   }
 
+  void _cancel() {
+    setState(() => _state = _DialogState.cancelled);
+    // Auto-dismiss after 300ms
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  void _abort() {
+    setState(() => _state = _DialogState.aborting);
+    // Simulate abort signal (UI only, no backend call per spec)
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() => _state = _DialogState.aborted);
+        // Auto-dismiss after showing "Stopped"
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted && Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final intent = widget.payload['intent'] ?? "Unknown Action";
@@ -882,9 +946,12 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
           decoration: BoxDecoration(
             border: _state == _DialogState.success
                 ? Border.all(color: Colors.greenAccent, width: 2)
-                : (_state == _DialogState.locked
+                : (_state == _DialogState.aborting ||
+                          _state == _DialogState.aborted
                       ? Border.all(color: Colors.amber, width: 2)
-                      : null),
+                      : (_state == _DialogState.locked
+                            ? Border.all(color: Colors.amber, width: 2)
+                            : null)),
             borderRadius: BorderRadius.circular(24),
           ),
           child: Column(
@@ -897,23 +964,41 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                   Icon(
                     _state == _DialogState.success
                         ? Icons.check_circle
-                        : (_state == _DialogState.locked
-                              ? Icons.warning_amber_rounded
-                              : Icons.verified_user_outlined),
+                        : (_state == _DialogState.cancelled
+                              ? Icons.cancel_outlined
+                              : (_state == _DialogState.aborting ||
+                                        _state == _DialogState.aborted
+                                    ? Icons.warning_amber_rounded
+                                    : (_state == _DialogState.locked
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.verified_user_outlined))),
                     color: _state == _DialogState.success
                         ? Colors.greenAccent
-                        : (_state == _DialogState.locked
-                              ? Colors.amber
-                              : Colors.cyanAccent.withOpacity(0.8)),
+                        : (_state == _DialogState.cancelled
+                              ? Colors.white60
+                              : (_state == _DialogState.aborting ||
+                                        _state == _DialogState.aborted
+                                    ? Colors.amber
+                                    : (_state == _DialogState.locked
+                                          ? Colors.amber
+                                          : Colors.cyanAccent.withOpacity(
+                                              0.8,
+                                            )))),
                     size: 24,
                   ),
                   const SizedBox(width: 12),
                   Text(
                     _state == _DialogState.success
                         ? "Action Completed"
-                        : (_state == _DialogState.locked
-                              ? "Paused"
-                              : "Review Action"),
+                        : (_state == _DialogState.cancelled
+                              ? "Action cancelled"
+                              : (_state == _DialogState.aborting
+                                    ? "Stopping action…"
+                                    : (_state == _DialogState.aborted
+                                          ? "Stopped"
+                                          : (_state == _DialogState.locked
+                                                ? "Paused"
+                                                : "Review Action")))),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w500,
@@ -988,10 +1073,7 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        // Optional: Send Cancel signal
-                      },
+                      onPressed: _cancel,
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.white54,
                       ),
@@ -1018,23 +1100,35 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
 
               if (_state == _DialogState.executing)
                 Row(
-                  children: const [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.cyanAccent,
-                      ),
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.cyanAccent,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          "Executing...",
+                          style: TextStyle(
+                            color: Colors.cyanAccent,
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 12),
-                    Text(
-                      "Executing...",
-                      style: TextStyle(
-                        color: Colors.cyanAccent,
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
+                    TextButton(
+                      onPressed: _abort,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white54,
                       ),
+                      child: const Text("Abort"),
                     ),
                   ],
                 ),
