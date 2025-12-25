@@ -831,6 +831,7 @@ enum _DialogState {
 class _ConfirmationDialogState extends State<_ConfirmationDialog>
     with SingleTickerProviderStateMixin {
   _DialogState _state = _DialogState.idle;
+  bool _isPreparing = false; // Track instant UI response before backend ACK
   StreamSubscription? _sub;
 
   @override
@@ -842,7 +843,10 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
       // Logic: Close the loop based on backend notification
       if (msg['type'] == 'notification' &&
           (msg['content'] ?? "").toString().contains("Status: Executed")) {
-        setState(() => _state = _DialogState.success);
+        setState(() {
+          _isPreparing = false;
+          _state = _DialogState.success;
+        });
         // Auto-dismiss
         Future.delayed(const Duration(milliseconds: 1200), () {
           if (mounted && Navigator.canPop(context)) {
@@ -851,8 +855,16 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
         });
       }
 
+      // Clear preparing state on any backend response
+      if (_isPreparing && msg['type'] == 'notification') {
+        setState(() => _isPreparing = false);
+      }
+
       if (msg['type'] == 'safety.violation') {
-        setState(() => _state = _DialogState.locked);
+        setState(() {
+          _isPreparing = false;
+          _state = _DialogState.locked;
+        });
       }
     });
   }
@@ -864,7 +876,13 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
   }
 
   void _approve() {
-    setState(() => _state = _DialogState.executing);
+    // Instant UI response (<16ms)
+    setState(() {
+      _state = _DialogState.executing;
+      _isPreparing = true;
+    });
+
+    // Send to backend (async, no await to avoid blocking UI)
     syncService.sendMessageJson({
       "type": "action.confirm",
       "payload": {
@@ -1074,33 +1092,38 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
-                      children: const [
+                      children: [
                         SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.cyanAccent,
+                            color: _isPreparing
+                                ? Colors.white54
+                                : Colors.cyanAccent,
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Text(
-                          "Executing...",
+                          _isPreparing ? "Preparing…" : "Executing...",
                           style: TextStyle(
-                            color: Colors.cyanAccent,
+                            color: _isPreparing
+                                ? Colors.white54
+                                : Colors.cyanAccent,
                             fontSize: 13,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
                       ],
                     ),
-                    TextButton(
-                      onPressed: _abort,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white54,
+                    if (!_isPreparing)
+                      TextButton(
+                        onPressed: _abort,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white54,
+                        ),
+                        child: const Text("Abort"),
                       ),
-                      child: const Text("Abort"),
-                    ),
                   ],
                 ),
 
