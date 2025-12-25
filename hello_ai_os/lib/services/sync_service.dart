@@ -30,15 +30,26 @@ class SyncService {
     try {
       debugPrint("SyncService: Connecting...");
       final uri = Uri.parse('ws://127.0.0.1:8000/ws');
+      debugPrint("SyncService: Connecting to $uri");
       _channel = WebSocketChannel.connect(uri);
 
-      // Wait for connection to be open before resetting retry
-      _statusController.add(true);
+      debugPrint(
+        "SyncService: WebSocket channel created, setting up listeners",
+      );
       _reconnectTimer?.cancel();
 
       _channel!.stream.listen(
         (data) {
           try {
+            debugPrint(
+              "SyncService: Received data: ${data.toString().substring(0, 100)}...",
+            );
+
+            // Set status to connected on first message
+            if (_statusController.hasListener) {
+              _statusController.add(true);
+            }
+
             final json = jsonDecode(data);
 
             // v1.3 Handling
@@ -68,6 +79,7 @@ class SyncService {
           _scheduleReconnect();
         },
       );
+      debugPrint("SyncService: Stream listeners attached successfully");
     } catch (e) {
       debugPrint("SyncService connection initialization error: $e");
       _statusController.add(false);

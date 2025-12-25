@@ -141,25 +141,32 @@ class LLMService:
         
         return final_intent
 
-    async def generate_response(self, text: str, history: list = None, stream: bool = False) -> str:
+    async def generate_response(self, query: str, user_id: str = "user", history: list = None, stream: bool = False) -> str:
         # 0. Deep Research Check (v1.9)
         research_keywords = ["research", "investigate", "analyze deeply", "full report"]
-        if any(k in text.lower() for k in research_keywords):
-             print(f"DEBUG: Routing to Deep Research Agent: {text}")
+        if any(k in query.lower() for k in research_keywords):
+             print(f"DEBUG: Routing to Deep Research Agent: {query}")
              from core.agents.deep_research_agent import deep_research_agent
-             res = await deep_research_agent.run(text)
+             res = await deep_research_agent.run(query)
              return f"**Deep Research Report**\n\n{res.get('final_answer', str(res))}\n\n*Sources: {len(res.get('citations', []))}*"
 
         # 1. Detect Intent
-        intent = await self._detect_intent(text)
-        print(f"DEBUG: Intent detected: {intent}")
+        # Quick heuristic: Common greetings should always be CHAT
+        greeting_words = ["hello", "hi", "hey", "greetings", "good morning", "good evening", "howdy", "sup"]
+        query_lower = query.lower().strip()
+        if any(g in query_lower for g in greeting_words) and len(query_lower.split()) <= 3:
+            intent = "CHAT"
+            print(f"DEBUG: Intent detected (greeting heuristic): {intent}")
+        else:
+            intent = await self._detect_intent(query)
+            print(f"DEBUG: Intent detected: {intent}")
 
         # 2. Route to Agent or Handle Chat
         if intent == "SEARCH":
             # Delegate to SearchAgent (it handles its own vector search usually, 
             # but we can enhance it here with _filter_context logic if we owned it)
             # For v1.9, SearchAgent.run() returns raw vector match objects.
-            results = await self._search_agent.run(text)
+            results = await self._search_agent.run(query)
             
             # Apply Filter
             # results[0]['results'] is the list
@@ -172,12 +179,12 @@ class LLMService:
                 
                 # I will construct context using my filter
                 context_str = self._filter_context(raw_list)
-                prompt = PROMPT_SEARCH.format(context=context_str, query=text)
+                prompt = PROMPT_SEARCH.format(context=context_str, query=query)
                 
                 response = await local_engine.generate(prompt)
                 
                 # Self Check
-                if not await self._self_check(text, response):
+                if not await self._self_check(query, response):
                     print("Self-check failed. Regenerating...")
                     response = await local_engine.generate(prompt + "\nRefine the answer to be more direct.")
                     
@@ -187,7 +194,7 @@ class LLMService:
 
         elif intent == "TASK":
             # Delegate to TaskAgent
-            plan = await self._task_agent.run(text)
+            plan = await self._task_agent.run(query)
             steps_str = json.dumps(plan, indent=2)
             
             # --- CHAINING LOGIC (v1.9) ---
@@ -203,11 +210,11 @@ class LLMService:
 
         elif intent == "VISION":
             from core.agents.vision_agent import vision_agent
-            return await vision_agent.run(text)
+            return await vision_agent.run(query)
 
         elif intent == "TOOL":
             from core.agents.tools_agent import tools_agent
-            return await tools_agent.run(text)
+            return await tools_agent.run(query)
 
         else:
             # CHAT
@@ -218,13 +225,13 @@ class LLMService:
             
             # 2. Vector Search (Long Term) - NOT in original CHAT logic, adding it for v1.9
             from core.vector_store import vector_store
-            long_term_results = vector_store.search(text, k=3)
+            long_term_results = vector_store.search(query, k=3)
             long_term_ctx = self._filter_context(long_term_results)
             
             full_prompt = PROMPT_CHAT.format(
                 context=long_term_ctx,
                 history=history_str,
-                query=text
+                query=query
             )
             
             # Generate
@@ -233,7 +240,7 @@ class LLMService:
             else:
                 response = await local_engine.generate(full_prompt)
                 # Self Check for Chat
-                if not await self._self_check(text, response):
+                if not await self._self_check(query, response):
                      # Retry once
                      response = await local_engine.generate(full_prompt + "\nSystem: Previous answer was off-topic. Try again.")
                 return response

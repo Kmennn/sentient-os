@@ -351,6 +351,12 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
                      # Ideally we just send the message. Client handles logic.
                      continue
                 
+                # Handle chat replies
+                if isinstance(event_data, dict) and event_data.get("type") == "chat.reply":
+                    print(f"DEBUG: Stream forwarding chat reply to WS")
+                    await websocket.send_json(event_data)
+                    continue
+                
                 # On generic event, generate FRESH state and send.
                 state = get_current_state()
                 await websocket.send_json(state.model_dump())
@@ -370,6 +376,24 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
                 try:
                     msg = json.loads(data)
                     msg_type = msg.get("type")
+                    
+                    # Handle chat messages
+                    if msg_type == "chat":
+                        logger.info(f"Received Chat Message: {msg.get('content', '')[:50]}...")
+                        content = msg.get("content", "")
+                        user_id = msg.get("user_id", "user")
+                        
+                        # Process with LLM
+                        response = await llm_service.generate_response(content, user_id=user_id)
+                        
+                        # Send response back
+                        reply = {
+                            "type": "chat.reply",
+                            "payload": {"text": response},
+                            "content": response
+                        }
+                        await queue.put(reply)
+                        logger.info(f"Chat response queued: {response[:50]}...")
                     
                     if msg_type == "action.confirm":
                         logger.info(f"Received Action Confirmation: {msg}")
