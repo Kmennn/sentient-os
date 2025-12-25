@@ -150,16 +150,10 @@ class LLMService:
              res = await deep_research_agent.run(query)
              return f"**Deep Research Report**\n\n{res.get('final_answer', str(res))}\n\n*Sources: {len(res.get('citations', []))}*"
 
-        # 1. Detect Intent
-        # Quick heuristic: Common greetings should always be CHAT
-        greeting_words = ["hello", "hi", "hey", "greetings", "good morning", "good evening", "howdy", "sup"]
-        query_lower = query.lower().strip()
-        if any(g in query_lower for g in greeting_words) and len(query_lower.split()) <= 3:
-            intent = "CHAT"
-            print(f"DEBUG: Intent detected (greeting heuristic): {intent}")
-        else:
-            intent = await self._detect_intent(query)
-            print(f"DEBUG: Intent detected: {intent}")
+        # 1. Detect Intent (using deterministic router)
+        from brain.core.intent_router import get_intent
+        intent = get_intent(query)
+        print(f"DEBUG: Intent detected: {intent}")
 
         # 2. Route to Agent or Handle Chat
         if intent == "SEARCH":
