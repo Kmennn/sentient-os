@@ -518,36 +518,7 @@ class _SentientShellState extends State<SentientShell> {
                               ),
                               tooltip: "Transparency Panel",
                             ),
-                            // DEBUG: Cancel Test
-                            IconButton(
-                              icon: const Icon(
-                                Icons.cancel,
-                                color: Colors.white60,
-                                size: 18,
-                              ),
-                              onPressed: () {
-                                _showConfirmationDialog({
-                                  "intent": "Cancel Test",
-                                  "summary": "Test cancel before execution.",
-                                  "action_id": "test-cancel",
-                                });
-                              },
-                            ),
-                            // DEBUG: Abort Test
-                            IconButton(
-                              icon: const Icon(
-                                Icons.warning_amber,
-                                color: Colors.amber,
-                                size: 18,
-                              ),
-                              onPressed: () {
-                                _showConfirmationDialog({
-                                  "intent": "Abort Test",
-                                  "summary": "Test abort during execution.",
-                                  "action_id": "test-abort",
-                                });
-                              },
-                            ),
+
                             IconButton(
                               icon: const Icon(
                                 Icons.build_circle_outlined,
