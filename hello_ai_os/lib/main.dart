@@ -182,7 +182,18 @@ class _SentientShellState extends State<SentientShell> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isBodyConnected = false);
+      if (mounted) {
+        setState(() => _isBodyConnected = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Connection to system services lost. Reconnecting...",
+            ),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
@@ -233,7 +244,13 @@ class _SentientShellState extends State<SentientShell> {
 
       _addMessage("VISION", "$desc\n[TAGS]: $tags", false);
     } catch (e) {
-      if (!silent) _addMessage("SYSTEM", "Vision Error: $e", true);
+      if (!silent) {
+        _addMessage(
+          "SYSTEM",
+          "Unable to capture or analyze screen. Please check system accessibility.",
+          true,
+        );
+      }
     }
   }
 

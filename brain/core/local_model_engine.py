@@ -68,18 +68,56 @@ class LocalModelEngine:
 
     def _fallback_generate(self, text: str) -> str:
         """
-        Deterministic fallback for verification reliability.
+        Deterministic fallback with varied responses.
         """
         t = text.lower()
+        
+        # Intent classification
         if "classify the user intent" in t:
              if "scroll" in t or "click" in t or "type" in t:
                  return "TASK"
              return "CHAT"
         
+        # Task planning
         if ("json list" in t or "task planner" in t) and ("scroll" in t or "click" in t):
              return json.dumps([{"action": "SCROLL_DOWN", "params": {}}])
-             
-        return "I am experiencing issues with my local model engine."
+        
+        # Varied contextual chat responses
+        # Greetings
+        if "hello" in t:
+            return "Hello! I'm JARVIS, your AI assistant. How can I help you today?"
+        if "hi" in t and len(t.split()) <= 2:
+            return "Hi there! What can I do for you?"
+        if "hey" in t:
+            return "Hey! Ready to assist. What do you need?"
+        
+        # Status/system queries
+        if "status" in t or "how are you" in t:
+            return "System operational. Local model offline, using fallback mode. Core functions available."
+        
+        # Questions
+        if t.startswith("what") or "what is" in t or "what are" in t:
+            return "I'm running in fallback mode with limited knowledge. For detailed answers, please ensure Ollama is running with sufficient RAM."
+        
+        if t.startswith("how") or "how do" in t or "how can" in t:
+            return "In fallback mode, I can help with basic tasks and system commands. What specific action would you like to perform?"
+        
+        if t.startswith("why") or "why is" in t:
+            return "I'm currently using fallback responses because the local LLM (Mistral) requires more RAM than is available."
+        
+        # Help
+        if "help" in t:
+            return "I can assist with system tasks like opening apps, scrolling, clicking. Try commands like 'open chrome' or 'scroll down'."
+        
+        # Appreciation
+        if "thank" in t or "thanks" in t:
+            return "You're welcome! Let me know if you need anything else."
+        
+        # Default with context
+        if len(t.split()) <= 3:
+            return f"I heard: '{text}'. I'm in fallback mode - responses are limited. What would you like to do?"
+        
+        return f"I understand you said: '{text[:50]}...'. My local model is unavailable. I can help with basic commands and tasks. What do you need?"
 
     async def generate_stream(self, text: str) -> Iterator[str]:
         """

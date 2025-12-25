@@ -16,7 +16,7 @@ class Config:
     
     # Ollama Configuration
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "mistral") # Updated to match installed model
+    LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "mistral:latest") # Full model tag
     
     # Legacy flag mapped to local mode for backward compatibility if needed, 
     # but strictly we are "local_llm" now.
