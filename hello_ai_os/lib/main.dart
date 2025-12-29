@@ -907,6 +907,13 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
         "authorized_by": "user_ui",
       },
     });
+
+    // Timeout: Show Abort button after 2s even if backend is slow
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && _isPreparing) {
+        setState(() => _isPreparing = false);
+      }
+    });
   }
 
   void _cancel() {
