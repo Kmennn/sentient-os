@@ -1,108 +1,155 @@
 """
-Intent Router - Deterministic classification for CHAT vs TASK
+Intent Router - P2.4 Intent Boundary Lock
 
-Rules:
-- CHAT is the default
-- TASK requires:
-  1. At least 2 tokens (verb + object)
-  2. Starts with an action verb
-  3. Has an object/target
-
-Examples:
-- "hello" -> CHAT (greeting)
-- "scroll down" -> TASK (verb + direction)
-- "open chrome" -> TASK (verb + app)
-- "scroll" -> CHAT (no object)
-- "can you scroll down" -> TASK (contains verb + object)
+CRITICAL SAFETY RULES:
+1. Default Intent = CHAT (if anything unclear → CHAT)
+2. TASK requires ALL 3:
+   - Explicit action verb (scroll, open, close, click, type, press, delete)
+   - Explicit object (down, up, chrome, file, window, tab, etc.)
+   - Imperative tone (no questions, no polite phrases)
+3. Hard blocks ALWAYS → CHAT:
+   - Greetings (hello, hi, hey)
+   - Questions ("can you", "could you", "would you")
+   - Polite phrases ("please", "would you mind")
+   - Single-word commands ("scroll", "open")
 """
 
 import logging
+from dataclasses import dataclass
+from typing import Optional
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-# Action verbs that indicate tasks
+@dataclass
+class IntentDecision:
+    """Logged decision for every intent classification"""
+    input: str
+    intent: str
+    reason: str
+    
+    def __str__(self):
+        return f"IntentDecision(input=\"{self.input[:50]}\", intent={self.intent}, reason=\"{self.reason}\")"
+
+
+# Explicit action verbs (must be present for TASK)
 ACTION_VERBS = {
-    # Navigation & Scrolling
-    "scroll", "navigate", "go", "move",
-    
-    # Application Control
-    "open", "close", "launch", "start", "stop", "kill", "quit",
-    
-    # Input Actions
-    "click", "type", "press", "enter", "select", "drag", "drop",
-    
-    # Window Management
-    "minimize", "maximize", "resize", "switch", "focus",
-    
-    # File Operations
-    "create", "delete", "rename", "copy", "paste", "cut", "save",
-    
-    # System Commands
-    "run", "execute", "shutdown", "restart", "sleep",
+    "scroll", "open", "close", "click", "type", "press", "delete",
+    "move", "drag", "drop", "minimize", "maximize", "resize",
+    "launch", "start", "stop", "kill", "quit", "navigate",
+    "run", "execute", "switch", "focus", "select", "copy", "paste", "cut"
 }
 
-# Common greetings/chat patterns
-CHAT_PATTERNS = {
-    "hello", "hi", "hey", "greetings", "good morning", "good afternoon", 
-    "good evening", "howdy", "sup", "what's up", "how are you",
-    "thanks", "thank you", "ok", "okay", "yes", "no", "why", "how",
-    "what", "when", "where", "who", "please", "help"
+# Explicit objects (must be present for TASK)
+VALID_OBJECTS = {
+    # Directions
+    "up", "down", "left", "right", "top", "bottom",
+    # Apps
+    "chrome", "firefox", "edge", "safari", "browser",
+    "notepad", "word", "excel", "terminal", "cmd", "powershell",
+    "vscode", "code", "spotify", "discord", "slack", "teams",
+    # UI Elements
+    "window", "tab", "file", "folder", "button", "link", "menu",
+    "screen", "desktop", "taskbar", "start",
+    # Generic
+    "app", "application", "program"
 }
 
+# Hard blocks - ALWAYS CHAT
+GREETINGS = {"hello", "hi", "hey", "greetings", "good morning", "good afternoon", "good evening", "howdy", "sup"}
 
-def classify_intent(query: str) -> str:
+# Question patterns - ALWAYS CHAT
+QUESTION_STARTERS = {"can you", "could you", "would you", "will you", "what", "how", "why", "when", "where", "who"}
+
+# Polite modifiers - ALWAYS CHAT  
+POLITE_WORDS = {"please", "kindly", "would you mind", "could you please"}
+
+
+def classify_intent(query: str) -> IntentDecision:
     """
-    Deterministic intent classification.
-    
-    Returns:
-        "CHAT" or "TASK"
+    Strict intent classification with safety-first approach.
+    Returns IntentDecision with logged reason.
     """
     query_lower = query.lower().strip()
     tokens = query_lower.split()
     
-    # Rule 1: Check greeting patterns (always CHAT)
-    if query_lower in CHAT_PATTERNS or any(pattern in query_lower for pattern in CHAT_PATTERNS):
-        if not any(verb in tokens for verb in ACTION_VERBS):
-            logger.info(f"Intent: CHAT (greeting/chat pattern) - '{query[:50]}'")
-            return "CHAT"
+    # RULE 1: Hard block - Greetings (ALWAYS CHAT)
+    if query_lower in GREETINGS:
+        decision = IntentDecision(query, "CHAT", "greeting (hard block)")
+        logger.info(str(decision))
+        return decision
     
-    # Rule 2: Must have at least 2 tokens for TASK
+    # Also check if starts with greeting
+    for greeting in GREETINGS:
+        if query_lower.startswith(greeting + " ") or query_lower == greeting:
+            decision = IntentDecision(query, "CHAT", f"starts with greeting '{greeting}' (hard block)")
+            logger.info(str(decision))
+            return decision
+    
+    # RULE 2: Hard block - Questions (ALWAYS CHAT)
+    for question in QUESTION_STARTERS:
+        if query_lower.startswith(question):
+            decision = IntentDecision(query, "CHAT", f"question pattern '{question}' (hard block)")
+            logger.info(str(decision))
+            return decision
+    
+    # RULE 3: Hard block - Polite phrases (ALWAYS CHAT)
+    for polite in POLITE_WORDS:
+        if polite in query_lower:
+            decision = IntentDecision(query, "CHAT", f"polite phrase '{polite}' (hard block)")
+            logger.info(str(decision))
+            return decision
+    
+    # RULE 4: Hard block - Single word (ALWAYS CHAT)
     if len(tokens) < 2:
-        logger.info(f"Intent: CHAT (too short, {len(tokens)} token) - '{query[:50]}'")
-        return "CHAT"
+        decision = IntentDecision(query, "CHAT", "single word (missing object)")
+        logger.info(str(decision))
+        return decision
     
-    # Rule 3: Check for action verb
-    has_action_verb = False
+    # RULE 5: Check for action verb
+    found_verb: Optional[str] = None
     verb_position = -1
-    
     for i, token in enumerate(tokens):
-        # Remove punctuation for matching
         clean_token = token.strip(",.!?;:")
         if clean_token in ACTION_VERBS:
-            has_action_verb = True
+            found_verb = clean_token
             verb_position = i
             break
     
-    if not has_action_verb:
-        logger.info(f"Intent: CHAT (no action verb) - '{query[:50]}'")
-        return "CHAT"
+    if not found_verb:
+        decision = IntentDecision(query, "CHAT", "no action verb")
+        logger.info(str(decision))
+        return decision
     
-    # Rule 4: Check if there's an object after the verb
-    # If verb is at the end or only has stop words after it, it's incomplete
-    if verb_position >= len(tokens) - 1:
-        logger.info(f"Intent: CHAT (verb '{tokens[verb_position]}' has no object) - '{query[:50]}'")
-        return "CHAT"
+    # RULE 6: Check for object AFTER verb
+    found_object: Optional[str] = None
+    for i in range(verb_position + 1, len(tokens)):
+        clean_token = tokens[i].strip(",.!?;:")
+        if clean_token in VALID_OBJECTS:
+            found_object = clean_token
+            break
     
-    # Has verb + object → TASK
-    logger.info(f"Intent: TASK (verb '{tokens[verb_position]}' + object) - '{query[:50]}'")
-    return "TASK"
+    if not found_object:
+        decision = IntentDecision(query, "CHAT", f"verb '{found_verb}' but missing valid object")
+        logger.info(str(decision))
+        return decision
+    
+    # RULE 7: Imperative tone check - verb should be near start (first 3 words)
+    if verb_position > 2:
+        decision = IntentDecision(query, "CHAT", f"verb '{found_verb}' not in imperative position (pos={verb_position})")
+        logger.info(str(decision))
+        return decision
+    
+    # ALL RULES PASSED → TASK
+    decision = IntentDecision(query, "TASK", f"verb '{found_verb}' + object '{found_object}' (imperative)")
+    logger.info(str(decision))
+    return decision
 
 
 def get_intent(query: str) -> str:
     """
     Public API for intent classification.
-    Logs every decision.
+    Returns "CHAT" or "TASK" only.
     """
-    intent = classify_intent(query)
-    logger.info(f"INTENT_DECISION: '{query[:50]}' → {intent}")
-    return intent
+    decision = classify_intent(query)
+    return decision.intent
