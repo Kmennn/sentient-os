@@ -334,6 +334,13 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     
     # Send initial state
     await websocket.send_json(get_current_state().model_dump())
+    
+    # P2.5: Emit brain.ready after all services are ready
+    logger.info("[READY] BrainReady emitted")
+    await websocket.send_json({
+        "type": "brain.ready",
+        "payload": {"ready": True}
+    })
 
     # Bi-directional Loops
     async def sender_loop():

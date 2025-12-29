@@ -3,6 +3,13 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter/foundation.dart';
 
+/// P2.5: Brain connection states
+enum BrainState {
+  disconnected, // RED - not connected
+  connected, // YELLOW - connected but not ready
+  ready, // GREEN - brain.ready received
+}
+
 class SyncService {
   static final SyncService _instance = SyncService._internal();
   factory SyncService() => _instance;
@@ -13,7 +20,13 @@ class SyncService {
 
   Stream<Map<String, dynamic>> get messages => _messageController.stream;
 
-  // v1.2: Status Stream
+  // P2.5: Brain state stream (replaces simple bool)
+  final _brainStateController = StreamController<BrainState>.broadcast();
+  Stream<BrainState> get brainStateStream => _brainStateController.stream;
+  BrainState _currentBrainState = BrainState.disconnected;
+  BrainState get currentBrainState => _currentBrainState;
+
+  // Legacy compatibility - true only when READY (GREEN)
   final _statusController = StreamController<bool>.broadcast();
   Stream<bool> get connectionStatus => _statusController.stream;
 
@@ -23,6 +36,15 @@ class SyncService {
 
   bool get isConnected => _channel != null;
   Timer? _reconnectTimer;
+
+  void _updateBrainState(BrainState newState, String reason) {
+    _currentBrainState = newState;
+    debugPrint("[STATE] BrainState=$newState (reason: $reason)");
+    _brainStateController.add(newState);
+
+    // Legacy status: true only when READY
+    _statusController.add(newState == BrainState.ready);
+  }
 
   void connect() {
     if (_channel != null) return;
@@ -45,12 +67,25 @@ class SyncService {
               "SyncService: Received data: ${data.toString().substring(0, 100)}...",
             );
 
-            // Set status to connected on first message
-            if (_statusController.hasListener) {
-              _statusController.add(true);
+            final json = jsonDecode(data);
+            final msgType = json['type']?.toString() ?? '';
+            debugPrint("SyncService: msg type='$msgType'");
+
+            // First message = YELLOW (connected but not ready)
+            // BUT: skip this if it's already a brain.ready message
+            if (_currentBrainState == BrainState.disconnected &&
+                msgType != 'brain.ready') {
+              _updateBrainState(BrainState.connected, "first message received");
             }
 
-            final json = jsonDecode(data);
+            // P2.5: Handle brain.ready event - only this makes dot GREEN
+            if (msgType == 'brain.ready') {
+              final isReady = json['payload']?['ready'] ?? false;
+              debugPrint("SyncService: brain.ready event, ready=$isReady");
+              if (isReady) {
+                _updateBrainState(BrainState.ready, "brain.ready received");
+              }
+            }
 
             // v1.3 Handling
             if (json['type'] == 'wake.ack') {
@@ -69,20 +104,20 @@ class SyncService {
         onDone: () {
           debugPrint("SyncService: Connection closed");
           _channel = null;
-          _statusController.add(false);
+          _updateBrainState(BrainState.disconnected, "connection closed");
           _scheduleReconnect();
         },
         onError: (error) {
           debugPrint("SyncService error: $error");
           _channel = null;
-          _statusController.add(false);
+          _updateBrainState(BrainState.disconnected, "connection error");
           _scheduleReconnect();
         },
       );
       debugPrint("SyncService: Stream listeners attached successfully");
     } catch (e) {
       debugPrint("SyncService connection initialization error: $e");
-      _statusController.add(false);
+      _updateBrainState(BrainState.disconnected, "connection init error");
       _scheduleReconnect();
     }
   }
@@ -135,7 +170,7 @@ class SyncService {
   void disconnect() {
     _channel?.sink.close();
     _channel = null;
-    _statusController.add(false);
+    _updateBrainState(BrainState.disconnected, "manual disconnect");
   }
 }
 

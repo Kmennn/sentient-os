@@ -64,11 +64,13 @@ class _SentientShellState extends State<SentientShell> {
 
   // States
   bool _isProcessing = false;
-  bool _isBrainConnected = false;
+  // P2.5: Brain state (RED/YELLOW/GREEN)
+  BrainState _brainState = BrainState.disconnected;
   bool _isBodyConnected = false;
   bool _isListening = false;
   bool _isAutoMode = false;
   Timer? _autoModeTimer;
+  Timer? _thinkingTimer; // P2.5: 12s safety timeout
 
   // Telemetry
   double _cpu = 0.0;
@@ -88,16 +90,38 @@ class _SentientShellState extends State<SentientShell> {
   void _initConnections() {
     // 1. Brain Connection
     syncService.connect();
-    syncService.connectionStatus.listen((connected) {
-      if (mounted) setState(() => _isBrainConnected = connected);
+    // P2.5: Listen to brain state (3-color logic)
+    syncService.brainStateStream.listen((state) {
+      if (mounted) {
+        debugPrint("[STATE] BrainState=$state");
+        setState(() => _brainState = state);
+      }
     });
     syncService.messages.listen((msg) {
       if (!mounted) return;
 
-      // Chat Reply
+      // P2.5: Clear thinking on chat.reply
       if (msg['type'] == 'chat.reply' || msg['type'] == 'conversation.result') {
         final content = msg['payload']?['text'] ?? msg['content'] ?? "...";
         _addMessage("JARVIS", content, false);
+        _thinkingTimer?.cancel();
+        debugPrint("[STATE] Thinking cleared (reason=chat.reply)");
+        setState(() => _isProcessing = false);
+      }
+
+      // P2.5: Clear thinking on action.confirmation
+      if (msg['type'] == 'action.confirmation') {
+        _thinkingTimer?.cancel();
+        debugPrint("[STATE] Thinking cleared (reason=action.confirmation)");
+        setState(() => _isProcessing = false);
+      }
+
+      // P2.5: Clear thinking on error
+      if (msg['type'] == 'error') {
+        _thinkingTimer?.cancel();
+        debugPrint("[STATE] Thinking cleared (reason=error)");
+        final errorMsg = msg['content'] ?? 'An error occurred';
+        _addMessage("SYSTEM", "❌ $errorMsg", true);
         setState(() => _isProcessing = false);
       }
 
@@ -320,6 +344,16 @@ class _SentientShellState extends State<SentientShell> {
     _input.clear();
     setState(() => _isProcessing = true);
 
+    // P2.5: Start 12s safety timeout
+    _thinkingTimer?.cancel();
+    _thinkingTimer = Timer(const Duration(seconds: 12), () {
+      if (mounted && _isProcessing) {
+        debugPrint("[STATE] Thinking cleared (reason=12s timeout)");
+        _addMessage("SYSTEM", "⚠️ Response timeout. Please try again.", true);
+        setState(() => _isProcessing = false);
+      }
+    });
+
     syncService.sendMessage(text);
   }
 
@@ -391,9 +425,11 @@ class _SentientShellState extends State<SentientShell> {
                                 ),
                               ),
                             _StatusDot(
-                              color: _isBrainConnected
+                              color: _brainState == BrainState.ready
                                   ? Colors.greenAccent
-                                  : Colors.redAccent,
+                                  : (_brainState == BrainState.connected
+                                        ? Colors.yellowAccent
+                                        : Colors.redAccent),
                               label: "Brain",
                             ),
                             const SizedBox(width: 8),
