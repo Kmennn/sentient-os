@@ -168,7 +168,7 @@ class _SentientShellState extends State<SentientShell> {
       timer,
     ) {
       _fetchBodyTelemetry();
-      if (_isBrainConnected) syncService.sendPing(); // Keepalive
+      if (_brainState == BrainState.ready) syncService.sendPing(); // Keepalive
     });
   }
 
@@ -730,35 +730,75 @@ class _SentientShellState extends State<SentientShell> {
                   ),
                 ),
 
-                // Thinking Indicator
-                if (_isProcessing)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
-                    child: Row(
-                      children: const [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.cyanAccent,
+                // P2.7: Apple-Style Skeleton Loading (NO SPINNERS)
+                AnimatedOpacity(
+                  opacity: _isProcessing ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 120),
+                  curve: Curves.easeOutCubic,
+                  child: _isProcessing
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 12.0,
                           ),
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          "Thinking...",
-                          style: TextStyle(
-                            color: Colors.cyanAccent,
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Sender skeleton
+                                  Container(
+                                    width: 48,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // Line 1 skeleton (longer)
+                                  Container(
+                                    width: 180,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.18),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // Line 2 skeleton (medium)
+                                  Container(
+                                    width: 140,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.14),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // Line 3 skeleton (shorter)
+                                  Container(
+                                    width: 90,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.10),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
 
                 // Input
                 Padding(
@@ -1236,15 +1276,42 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                   children: [
                     Row(
                       children: [
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: _isPreparing
-                                ? Colors.white.withOpacity(0.4)
-                                : Colors.cyanAccent.withOpacity(0.8),
-                          ),
+                        // P2.7: Apple-style skeleton dots instead of spinner
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: _isPreparing
+                                    ? Colors.white.withOpacity(0.25)
+                                    : Colors.cyanAccent.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: _isPreparing
+                                    ? Colors.white.withOpacity(0.18)
+                                    : Colors.cyanAccent.withOpacity(0.45),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: _isPreparing
+                                    ? Colors.white.withOpacity(0.12)
+                                    : Colors.cyanAccent.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 12),
                         Text(
