@@ -303,16 +303,23 @@ class _SentientShellState extends State<SentientShell> {
       context: context,
       barrierDismissible: false,
       barrierLabel: "Dismiss",
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 250),
+      barrierColor: Colors.black.withOpacity(0.6),
+      transitionDuration: const Duration(
+        milliseconds: 240,
+      ), // P2.6: Apple timing
       pageBuilder: (ctx, anim1, anim2) {
         return Container(); // unused
       },
       transitionBuilder: (ctx, anim1, anim2, child) {
+        // P2.6: Apple-like entry - Scale 0.96→1.0 + Fade, easeOutCubic
+        final scaleAnim = Tween<double>(
+          begin: 0.96,
+          end: 1.0,
+        ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic));
         return ScaleTransition(
-          scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+          scale: scaleAnim,
           child: FadeTransition(
-            opacity: anim1,
+            opacity: CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic),
             child: _ConfirmationDialog(payload: payload),
           ),
         );
@@ -862,6 +869,84 @@ class _AnimatedStat extends StatelessWidget {
 }
 
 // v1.9: Action Confirmation Dialog with Micro-Feedback
+
+// P2.6: Apple-style button with press/release animations (no Material ripples)
+class _AppleButton extends StatefulWidget {
+  final String label;
+  final VoidCallback onPressed;
+  final bool isPrimary;
+  final Color? color;
+
+  const _AppleButton({
+    required this.label,
+    required this.onPressed,
+    this.isPrimary = false,
+    this.color,
+  });
+
+  @override
+  State<_AppleButton> createState() => _AppleButtonState();
+}
+
+class _AppleButtonState extends State<_AppleButton> {
+  bool _isPressed = false;
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor =
+        widget.color ?? (widget.isPrimary ? Colors.cyanAccent : Colors.white);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) {
+          setState(() => _isPressed = false);
+          widget.onPressed();
+        },
+        onTapCancel: () => setState(() => _isPressed = false),
+        child: AnimatedScale(
+          scale: _isPressed ? 0.98 : 1.0,
+          duration: Duration(milliseconds: _isPressed ? 80 : 120),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.isPrimary ? 20 : 16,
+              vertical: 12,
+            ),
+            decoration: BoxDecoration(
+              color: widget.isPrimary
+                  ? baseColor.withOpacity(_isHovered ? 0.16 : 0.10)
+                  : Colors.transparent.withOpacity(_isHovered ? 0.06 : 0),
+              borderRadius: BorderRadius.circular(8),
+              border: widget.isPrimary
+                  ? Border.all(color: baseColor.withOpacity(0.3))
+                  : null,
+            ),
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                color: widget.isPrimary
+                    ? baseColor
+                    : baseColor.withOpacity(0.7),
+                fontWeight: widget.isPrimary
+                    ? FontWeight.w600
+                    : FontWeight.w500,
+                fontSize: 14,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ConfirmationDialog extends StatefulWidget {
   final Map<String, dynamic> payload;
 
@@ -985,23 +1070,34 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
 
     return Center(
       child: Material(
-        color: const Color(0xFF252525),
-        borderRadius: BorderRadius.circular(24),
-        elevation: 12,
+        color: const Color(0xFF1C1C1E), // P2.6: Apple dark mode gray
+        borderRadius: BorderRadius.circular(16), // P2.6: Consistent 16px
+        elevation: 8, // P2.6: Softer shadow
+        shadowColor: Colors.black.withOpacity(0.5),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 320,
-          padding: const EdgeInsets.all(24),
+          duration: const Duration(milliseconds: 240), // P2.6: Apple timing
+          curve: Curves.easeOutCubic,
+          width: 340, // P2.6: Slightly wider for breathing
+          padding: const EdgeInsets.all(28), // P2.6: More padding
           decoration: BoxDecoration(
             border: _state == _DialogState.success
-                ? Border.all(color: Colors.greenAccent, width: 2)
+                ? Border.all(
+                    color: Colors.greenAccent.withOpacity(0.6),
+                    width: 1.5,
+                  )
                 : (_state == _DialogState.aborting ||
                           _state == _DialogState.aborted
-                      ? Border.all(color: Colors.amber, width: 2)
+                      ? Border.all(
+                          color: Colors.amber.withOpacity(0.6),
+                          width: 1.5,
+                        )
                       : (_state == _DialogState.locked
-                            ? Border.all(color: Colors.amber, width: 2)
+                            ? Border.all(
+                                color: Colors.amber.withOpacity(0.6),
+                                width: 1.5,
+                              )
                             : null)),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1057,8 +1153,7 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-
+              const SizedBox(height: 20), // P2.6: More space
               // Content
               if (_state == _DialogState.idle ||
                   _state == _DialogState.executing)
@@ -1067,29 +1162,34 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                   children: [
                     Text(
                       summary,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(
+                          0.70,
+                        ), // P2.6: Secondary 70%
                         fontSize: 14,
-                        height: 1.4,
+                        height: 1.5,
+                        letterSpacing: 0.1,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12), // P2.6: More space
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                        horizontal: 12,
+                        vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black26,
+                        color: Colors.white.withOpacity(0.04),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white10),
                       ),
                       child: Text(
                         "Intent: $intent",
-                        style: const TextStyle(
-                          color: Colors.white38,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(
+                            0.55,
+                          ), // P2.6: Technical 55%
                           fontSize: 11,
                           fontFamily: 'Monospace',
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
@@ -1114,35 +1214,18 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                   ),
                 ),
 
-              const SizedBox(height: 24),
-
+              const SizedBox(height: 28), // P2.6: More breathing space
               // Actions
               if (_state == _DialogState.idle)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
-                      onPressed: _cancel,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white54,
-                      ),
-                      child: const Text("Cancel"),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
+                    _AppleButton(label: "Cancel", onPressed: _cancel),
+                    const SizedBox(width: 8),
+                    _AppleButton(
+                      label: "Approve",
                       onPressed: _approve,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.cyanAccent.withOpacity(0.1),
-                        foregroundColor: Colors.cyanAccent,
-                        elevation: 0,
-                        side: BorderSide(
-                          color: Colors.cyanAccent.withOpacity(0.3),
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text("Approve"),
+                      isPrimary: true,
                     ),
                   ],
                 ),
@@ -1154,35 +1237,33 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                     Row(
                       children: [
                         SizedBox(
-                          width: 16,
-                          height: 16,
+                          width: 14,
+                          height: 14,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                            strokeWidth: 1.5,
                             color: _isPreparing
-                                ? Colors.white54
-                                : Colors.cyanAccent,
+                                ? Colors.white.withOpacity(0.4)
+                                : Colors.cyanAccent.withOpacity(0.8),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          _isPreparing ? "Preparing…" : "Executing...",
+                          _isPreparing ? "Preparing…" : "Executing…",
                           style: TextStyle(
                             color: _isPreparing
-                                ? Colors.white54
-                                : Colors.cyanAccent,
+                                ? Colors.white.withOpacity(0.55)
+                                : Colors.cyanAccent.withOpacity(0.9),
                             fontSize: 13,
-                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
                     ),
                     if (!_isPreparing)
-                      TextButton(
+                      _AppleButton(
+                        label: "Abort",
                         onPressed: _abort,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white54,
-                        ),
-                        child: const Text("Abort"),
+                        color: Colors.amber,
                       ),
                   ],
                 ),
@@ -1191,11 +1272,9 @@ class _ConfirmationDialogState extends State<_ConfirmationDialog>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: const Text("Dismiss"),
+                    _AppleButton(
+                      label: "Dismiss",
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
