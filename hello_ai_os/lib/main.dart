@@ -682,8 +682,12 @@ class _SentientShellState extends State<SentientShell> {
                     itemBuilder: (context, i) {
                       final m = _messages[i];
                       final isYou = m.sender == "YOU";
+                      final screenWidth = MediaQuery.of(context).size.width;
+
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6.0,
+                        ), // P2.8: More breathing
                         child: Align(
                           alignment: m.isSystem
                               ? Alignment.center
@@ -692,36 +696,77 @@ class _SentientShellState extends State<SentientShell> {
                                     : Alignment.centerLeft),
                           child: m.isSystem
                               ? Padding(
-                                  padding: const EdgeInsets.all(8.0),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16.0,
+                                    vertical: 8.0,
+                                  ),
                                   child: Text(
                                     m.text,
-                                    style: const TextStyle(
-                                      color: Colors.white38,
-                                      fontSize: 10,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(
+                                        0.45,
+                                      ), // P2.8: Slightly more visible
+                                      fontSize: 12,
+                                      height: 1.4,
+                                      fontWeight: FontWeight.w400,
                                     ),
                                   ),
                                 )
-                              : GlassContainer(
-                                  color: isYou
-                                      ? Colors.cyan.withValues(alpha: 0.2)
-                                      : Colors.black.withValues(alpha: 0.3),
-                                  padding: const EdgeInsets.all(12),
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        m.sender,
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          color: Colors.white.withValues(
-                                            alpha: 0.4,
+                              : ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth:
+                                        screenWidth *
+                                        0.70, // P2.8: Max 70% width
+                                  ),
+                                  child: GlassContainer(
+                                    color: isYou
+                                        ? Colors.cyan.withValues(
+                                            alpha: 0.15,
+                                          ) // P2.8: Slightly softer
+                                        : Colors.white.withValues(alpha: 0.06),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal:
+                                          16, // P2.8: More horizontal space
+                                      vertical:
+                                          12, // P2.8: Comfortable vertical
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          m.sender,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w500,
+                                            letterSpacing: 0.5,
+                                            color: Colors.white.withOpacity(
+                                              isYou ? 0.5 : 0.4,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      Text(m.text),
-                                    ],
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          m.text,
+                                          style: TextStyle(
+                                            fontSize:
+                                                15, // P2.8: Apple-like size
+                                            height:
+                                                1.4, // P2.8: Comfortable line height
+                                            fontWeight: isYou
+                                                ? FontWeight.w500
+                                                : FontWeight.w400,
+                                            color: Colors.white.withOpacity(
+                                              isYou
+                                                  ? 1.0
+                                                  : 0.92, // P2.8: Subtle distinction
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                         ),
