@@ -60,30 +60,30 @@ class _SentientShellState extends State<SentientShell> {
   // States
   // P3.5: Cold Start Indication
   bool _isColdStart = false;
-  final bool _isProcessing = false;
+  bool _isProcessing = false;
   String?
   _pendingMessageId; // P3.1: Track current pending message for lifecycle integrity
   // P2.5: Brain state (RED/YELLOW/GREEN)
   BrainState _brainState = BrainState.disconnected;
-  final bool _isBodyConnected = false;
-  final bool _isListening = false;
-  final bool _isAutoMode = false;
+  bool _isBodyConnected = false;
+  bool _isListening = false;
+  bool _isAutoMode = false;
   Timer? _autoModeTimer;
   Timer? _thinkingTimer; // P2.5: 12s safety timeout
 
   // P3.3: Resource Leak Detection (Frontend)
   static const int MAX_PENDING_MESSAGES = 3;
   static const int MAX_ACTIVE_TIMERS = 3;
-  final int _pendingMessagesCount = 0;
-  final int _activeTimersCount = 0;
-  final bool _leakSuspected = false;
+  int _pendingMessagesCount = 0;
+  int _activeTimersCount = 0;
+  bool _leakSuspected = false;
 
   // Telemetry
-  final double _cpu = 0.0;
-  final double _ram = 0.0;
-  final String _osType = "Unknown";
-  final int _procCount = 0;
-  final Map<String, dynamic> _rawBodyStats = {};
+  double _cpu = 0.0;
+  double _ram = 0.0;
+  String _osType = "Unknown";
+  int _procCount = 0;
+  Map<String, dynamic> _rawBodyStats = {};
 
   Timer? _telemetryTimer;
 
@@ -151,7 +151,6 @@ class _SentientShellState extends State<SentientShell> {
           "⚠️ ${msg['content'] ?? 'Safety Violation'}",
           true,
         );
-      }
       }
       if (msg['type'] == 'action.cancelled') {
         _addMessage("SYSTEM", "🚫 Action cancelled by system.", true);
