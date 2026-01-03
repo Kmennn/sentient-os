@@ -27,3 +27,6 @@ class EventType(StrEnum):
     # P3.3: Resource Leak Detection (edge-triggered)
     RESOURCE_LEAK_SUSPECTED = auto()
     RESOURCE_LEAK_CLEARED = auto()
+
+    # P3.5: Cold Start
+    LLM_COLD_START = "llm.cold_start"

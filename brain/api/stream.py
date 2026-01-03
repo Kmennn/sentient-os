@@ -338,6 +338,9 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     event_bus.subscribe_async(EventType.RESOURCE_LEAK_SUSPECTED, event_handler)
     event_bus.subscribe_async(EventType.RESOURCE_LEAK_CLEARED, event_handler)
     
+    # P3.5: Subscribe to cold start event
+    event_bus.subscribe_async(EventType.LLM_COLD_START, event_handler)
+    
     # Send initial state
     await websocket.send_json(get_current_state().model_dump())
     
@@ -345,7 +348,15 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     from brain.core.local_model_engine import local_engine
     from brain.core.config import config
     if getattr(config, 'PREWARM_MODEL', True):
-        await local_engine.prewarm()
+        # Fire and forget prewarm so we don't block startup
+        pass
+        # await local_engine.prewarm() 
+        # Actually prewarm IS checking _warmed_up so calling it here is fine/good.
+        # But we want faster startup. Let's make it background task?
+        # For P3.5 we rely on load() inside generate(). 
+        # But prewarm on STARTUP is still good.
+        import asyncio
+        asyncio.create_task(local_engine.prewarm())
     
     # P2.5: Emit brain.ready after all services are ready
     logger.info("[READY] BrainReady emitted")
@@ -361,8 +372,20 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
                 # Wait for event
                 event_data = await queue.get()
                 
+                # Check for object (EventType enum key) vs dict
+                event_type = None
+                if isinstance(event_data, dict):
+                    event_type = event_data.get("type")
+                
+                # P3.5: Forward cold start
+                if event_type == "llm.cold_start":
+                    await websocket.send_json({
+                        "type": "llm.cold_start"
+                    })
+                    continue
+                
                 # If explicit message (like confirmation request), send payload directly
-                if isinstance(event_data, dict) and event_data.get("type") == "action.confirmation":
+                if isinstance(event_data, dict) and event_type == "action.confirmation":
                      ids = event_data.get("payload", {}).get("action_id")
                      print(f"DEBUG: Stream forwarding confirmation {ids} to WS")
                      await websocket.send_json(event_data)

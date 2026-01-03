@@ -75,6 +75,12 @@ class LocalModelEngine:
             logger.info("[P3.4] Model already loaded")
             return
         
+        # P3.5: Emit cold start event for UI feedback
+        from brain.events.event_bus import event_bus
+        from brain.events.event_types import EventType
+        event_bus.emit(EventType.LLM_COLD_START, {"model": self.model_name})
+        logger.info("[P3.5] LLM cold start initiated")
+        
         self._log_ram("Before load")
         await self.prewarm()
         self._is_loaded = True

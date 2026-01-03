@@ -58,30 +58,32 @@ class _SentientShellState extends State<SentientShell> {
   final ScrollController _scrollController = ScrollController();
 
   // States
-  bool _isProcessing = false;
+  // P3.5: Cold Start Indication
+  bool _isColdStart = false;
+  final bool _isProcessing = false;
   String?
   _pendingMessageId; // P3.1: Track current pending message for lifecycle integrity
   // P2.5: Brain state (RED/YELLOW/GREEN)
   BrainState _brainState = BrainState.disconnected;
-  bool _isBodyConnected = false;
-  bool _isListening = false;
-  bool _isAutoMode = false;
+  final bool _isBodyConnected = false;
+  final bool _isListening = false;
+  final bool _isAutoMode = false;
   Timer? _autoModeTimer;
   Timer? _thinkingTimer; // P2.5: 12s safety timeout
 
   // P3.3: Resource Leak Detection (Frontend)
   static const int MAX_PENDING_MESSAGES = 3;
   static const int MAX_ACTIVE_TIMERS = 3;
-  int _pendingMessagesCount = 0;
-  int _activeTimersCount = 0;
-  bool _leakSuspected = false;
+  final int _pendingMessagesCount = 0;
+  final int _activeTimersCount = 0;
+  final bool _leakSuspected = false;
 
   // Telemetry
-  double _cpu = 0.0;
-  double _ram = 0.0;
-  String _osType = "Unknown";
-  int _procCount = 0;
-  Map<String, dynamic> _rawBodyStats = {};
+  final double _cpu = 0.0;
+  final double _ram = 0.0;
+  final String _osType = "Unknown";
+  final int _procCount = 0;
+  final Map<String, dynamic> _rawBodyStats = {};
 
   Timer? _telemetryTimer;
 
@@ -150,12 +152,19 @@ class _SentientShellState extends State<SentientShell> {
           true,
         );
       }
+      }
       if (msg['type'] == 'action.cancelled') {
         _addMessage("SYSTEM", "🚫 Action cancelled by system.", true);
         // If dialog is open, it should ideally close, but for now log it.
         if (Navigator.canPop(context)) {
           // This is risky if we pop the wrong thing, sticking to message for now.
         }
+      }
+      
+      // P3.5: Handle Cold Start
+      if (msg['type'] == 'llm.cold_start') {
+        debugPrint("[P3.5] UI received llm.cold_start");
+        setState(() => _isColdStart = true);
       }
     });
 
@@ -171,7 +180,7 @@ class _SentientShellState extends State<SentientShell> {
     });
 
     // 2. Body Polling (Stream simulation via polling /stream)
-    _telemetryTimer = Timer.periodic(const Duration(milliseconds: 1500), (
+    final _telemetryTimer = Timer.periodic(const Duration(milliseconds: 1500), (
       timer,
     ) {
       _fetchBodyTelemetry();
@@ -396,7 +405,10 @@ class _SentientShellState extends State<SentientShell> {
     _checkResourceLeak();
 
     if (mounted) {
-      setState(() => _isProcessing = false);
+      setState(() {
+        _isProcessing = false;
+        _isColdStart = false; // P3.5: Reset cold start state
+      });
     }
   }
 
@@ -906,6 +918,19 @@ class _SentientShellState extends State<SentientShell> {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                   ),
+                                  // P3.5: Cold Start Text
+                                  if (_isColdStart)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8, bottom: 2),
+                                      child: Text(
+                                        "Warming up...",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.cyanAccent.withOpacity(0.8),
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
                                   const SizedBox(height: 10),
                                   // Line 1 skeleton (longer)
                                   Container(
