@@ -12,9 +12,15 @@ import hashlib
 from core.config import config
 
 logging.basicConfig(level=logging.INFO)
+import psutil
+import time
+
 logger = logging.getLogger(__name__)
 
 class LocalModelEngine:
+    # P3.4: Idle unload settings
+    IDLE_UNLOAD_SECONDS = 300  # 5 minutes
+    
     def __init__(self):
         self.ollama_url = config.OLLAMA_URL
         self.model_name = config.LOCAL_LLM_MODEL
@@ -22,8 +28,57 @@ class LocalModelEngine:
         self.embedding_model = None
         self._warmed_up = False
         
+        # P3.4: Idle tracking
+        self._last_used_ts = time.time()
+        self._is_loaded = False
+        
         # Lazy load embeddings to avoid startup delay
         # self._load_embedding_model_async() # Do NOT load on import, it blocks main thread.
+    
+    @property
+    def is_loaded(self) -> bool:
+        """Check if model is currently loaded."""
+        return self._is_loaded and self._warmed_up
+    
+    def _log_ram(self, context: str):
+        """Log current RAM usage."""
+        ram = psutil.virtual_memory()
+        logger.info(f"[P3.4] {context} - RAM: {ram.percent}% used ({ram.used // (1024*1024)}MB / {ram.total // (1024*1024)}MB)")
+    
+    async def unload(self):
+        """Unload model from memory via Ollama API."""
+        if not self._is_loaded:
+            logger.info("[P3.4] Model already unloaded")
+            return
+        
+        self._log_ram("Before unload")
+        
+        try:
+            url = f"{self.ollama_url}/api/generate"
+            payload = {
+                "model": self.model_name,
+                "keep_alive": 0  # Tell Ollama to unload immediately
+            }
+            async with httpx.AsyncClient() as client:
+                await client.post(url, json=payload, timeout=10.0)
+            
+            self._is_loaded = False
+            self._warmed_up = False
+            logger.info(f"[P3.4] Model {self.model_name} unloaded due to idle")
+            self._log_ram("After unload")
+        except Exception as e:
+            logger.error(f"[P3.4] Unload error: {e}")
+    
+    async def load(self):
+        """Load model into memory (alias for prewarm)."""
+        if self._is_loaded:
+            logger.info("[P3.4] Model already loaded")
+            return
+        
+        self._log_ram("Before load")
+        await self.prewarm()
+        self._is_loaded = True
+        self._log_ram("After load")
 
     async def prewarm(self):
         """
@@ -75,6 +130,14 @@ class LocalModelEngine:
         """
         if config.MOCK_LLM:
              return f"Local Mock: {text}"
+        
+        # P3.4: Track last used time
+        self._last_used_ts = time.time()
+        
+        # P3.4: Auto-reload if model was unloaded
+        if not self.is_loaded:
+            logger.info("[P3.4] Model not loaded, reloading...")
+            await self.load()
 
         url = f"{self.ollama_url}/api/generate"
         payload = {

@@ -1259,6 +1259,19 @@ class MissionScheduler:
             })
             logger.info(f"[P3.3] RESOURCE_LEAK_CLEARED: system recovered")
 
+        # P3.4: LLM Idle Memory Guard - check if model should be unloaded
+        try:
+            from brain.core.local_model_engine import local_engine
+            import time
+            if local_engine.is_loaded:
+                idle_time = time.time() - local_engine._last_used_ts
+                if idle_time > local_engine.IDLE_UNLOAD_SECONDS:
+                    import asyncio
+                    asyncio.create_task(local_engine.unload())
+                    logger.info(f"[P3.4] Triggered LLM unload after {idle_time:.0f}s idle")
+        except Exception as e:
+            logger.debug(f"[P3.4] Idle check skipped: {e}")
+
         # S8: Populate Health Snapshot (Before clearing context)
         self._last_state_snapshot = {
             "last_tick_duration_ms": int(elapsed_ms),
