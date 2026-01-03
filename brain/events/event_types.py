@@ -19,3 +19,7 @@ class EventType(StrEnum):
     CLIENT_DISCONNECTED = auto()
     
     STATE_SNAPSHOT_UPDATED = auto()
+    
+    # P3.2: Scheduler Stall Detection (edge-triggered)
+    SCHEDULER_STALL_DETECTED = auto()
+    SCHEDULER_STALL_CLEARED = auto()

@@ -212,6 +212,11 @@ class MissionScheduler:
         self._backpressure_active: bool = False
         self._last_state_snapshot: dict = {}
         
+        # P3.2: Stall Detection State (edge-triggered)
+        self._consecutive_slow_ticks: int = 0
+        self._consecutive_healthy_ticks: int = 0
+        self._stall_active: bool = False
+        
         # H4: Voice Output Manager
         self.voice_manager = VoiceOutputManager(self) # access to context via self
         
@@ -1153,24 +1158,27 @@ class MissionScheduler:
         elapsed_ms = (time.monotonic() - tick_start) * 1000
         self._last_tick_duration_ms = elapsed_ms
         
+        # P3.2: Stall Detection (edge-triggered)
         if elapsed_ms >= SLOW_TICK_THRESHOLD_MS:
-            # Check if we need to log
-            # We use a temp context if needed or assume we can append to ledger?
-            # Wait, record phase is over. _run_record_phase flushes.
-            # If we log here, it won't be flushed until NEXT tick if we append to pending.
-            # OR we append directly to ledger if _tick_context is still alive (it is).
-            # But we must be careful about phase assertions if we strictly enforced them.
-            # Ideally we log in current context.
-            
-            # Re-enter RECORD phase momentarily? Or just append since we are "system"?
-            # Prompt says "Log a ledger event... Update a scheduler field".
-            # Let's append directly to ledger (bypassing phase check or re-entering).
-            # But `_log_autonomy_decision` appends to `_pending_ledger_entries`.
-            # And `_run_record_phase` flushes them.
-            # So if we log now, it sits in pending until NEXT tick's record phase.
-            # That is acceptable and robust.
+            # Slow tick detected
+            self._consecutive_slow_ticks += 1
+            self._consecutive_healthy_ticks = 0  # Reset healthy counter
             
             self._log_autonomy_decision(DecisionType.SLOW_TICK_DETECTED, reason=f"Duration: {elapsed_ms:.2f}ms", was_auto=False)
+            
+            # P3.2: Emit STALL ONCE after 3 consecutive slow ticks
+            if self._consecutive_slow_ticks >= 3 and not self._stall_active:
+                self._stall_active = True
+                self._log_autonomy_decision(
+                    DecisionType.SCHEDULER_STALL_DETECTED, 
+                    reason=f"3 consecutive slow ticks (>{SLOW_TICK_THRESHOLD_MS}ms)", 
+                    was_auto=False
+                )
+                self.event_bus.emit(EventType.SCHEDULER_STALL_DETECTED, {
+                    "consecutive_slow_ticks": self._consecutive_slow_ticks,
+                    "last_tick_ms": elapsed_ms
+                })
+                logger.warning(f"[P3.2] SCHEDULER_STALL_DETECTED: {self._consecutive_slow_ticks} slow ticks")
             
             # Backpressure Logic
             if elapsed_ms >= MAX_TICK_DURATION_MS:
@@ -1178,6 +1186,25 @@ class MissionScheduler:
                     self._backpressure_active = True
                     self._log_autonomy_decision(DecisionType.BACKPRESSURE_ENABLED, reason=f"Tick exceeded {MAX_TICK_DURATION_MS}ms", was_auto=False)
         else:
+            # Healthy tick
+            self._consecutive_slow_ticks = 0  # Reset slow counter
+            self._consecutive_healthy_ticks += 1
+            
+            # P3.2: Clear STALL ONCE after 2 consecutive healthy ticks
+            if self._stall_active and self._consecutive_healthy_ticks >= 2:
+                self._stall_active = False
+                self._log_autonomy_decision(
+                    DecisionType.SCHEDULER_STALL_CLEARED, 
+                    reason=f"2 consecutive healthy ticks (<{SLOW_TICK_THRESHOLD_MS}ms)", 
+                    was_auto=False
+                )
+                self.event_bus.emit(EventType.SCHEDULER_STALL_CLEARED, {
+                    "consecutive_healthy_ticks": self._consecutive_healthy_ticks,
+                    "last_tick_ms": elapsed_ms
+                })
+                logger.info(f"[P3.2] SCHEDULER_STALL_CLEARED: system recovered")
+            
+            if self._backpressure_active:
                 self._backpressure_active = False
                 self._log_autonomy_decision(DecisionType.BACKPRESSURE_CLEARED, reason=f"Tick recovered: {elapsed_ms:.2f}ms", was_auto=False)
 

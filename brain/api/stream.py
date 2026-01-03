@@ -331,6 +331,9 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     event_bus.subscribe_async(EventType.CLIENT_CONNECTED, event_handler)
     event_bus.subscribe_async(EventType.CLIENT_DISCONNECTED, event_handler)
     event_bus.subscribe_async(EventType.ACTION_CONFIRMATION_REQUEST, event_handler) # v1.9 Logic
+    # P3.2: Subscribe to stall detection events
+    event_bus.subscribe_async(EventType.SCHEDULER_STALL_DETECTED, event_handler)
+    event_bus.subscribe_async(EventType.SCHEDULER_STALL_CLEARED, event_handler)
     
     # Send initial state
     await websocket.send_json(get_current_state().model_dump())

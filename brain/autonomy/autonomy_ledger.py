@@ -88,6 +88,9 @@ class DecisionType(Enum):
     CONTEXT_SIGNAL_RECEIVED = "context_signal_received"
     FEEDBACK_RECEIVED = "feedback_received"
     ATTENTION_SUPPRESSED = "attention_suppressed"
+    # P3.2: Scheduler Stall Detection (edge-triggered)
+    SCHEDULER_STALL_DETECTED = "scheduler_stall_detected"
+    SCHEDULER_STALL_CLEARED = "scheduler_stall_cleared"
 
 @dataclass
 class AutonomyDecision:
