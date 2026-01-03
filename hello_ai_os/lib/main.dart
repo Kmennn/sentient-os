@@ -59,6 +59,8 @@ class _SentientShellState extends State<SentientShell> {
 
   // States
   bool _isProcessing = false;
+  String?
+  _pendingMessageId; // P3.1: Track current pending message for lifecycle integrity
   // P2.5: Brain state (RED/YELLOW/GREEN)
   BrainState _brainState = BrainState.disconnected;
   bool _isBodyConnected = false;
@@ -95,29 +97,32 @@ class _SentientShellState extends State<SentientShell> {
     syncService.messages.listen((msg) {
       if (!mounted) return;
 
-      // P2.5: Clear thinking on chat.reply
+      // P3.1: Clear thinking on chat.reply (with message_id matching)
       if (msg['type'] == 'chat.reply' || msg['type'] == 'conversation.result') {
+        final receivedId = msg['message_id']?.toString();
         final content = msg['payload']?['text'] ?? msg['content'] ?? "...";
-        _addMessage("JARVIS", content, false);
-        _thinkingTimer?.cancel();
-        debugPrint("[STATE] Thinking cleared (reason=chat.reply)");
-        setState(() => _isProcessing = false);
+
+        // P3.1: Only process if message_id matches or no tracking (legacy)
+        if (receivedId == null || receivedId == _pendingMessageId) {
+          _addMessage("JARVIS", content, false);
+          _resolveMessage("chat.reply (id=$receivedId)");
+        } else {
+          debugPrint(
+            "[P3.1] Ignoring stale reply (got=$receivedId, expected=$_pendingMessageId)",
+          );
+        }
       }
 
-      // P2.5: Clear thinking on action.confirmation
+      // P3.1: Clear thinking on action.confirmation
       if (msg['type'] == 'action.confirmation') {
-        _thinkingTimer?.cancel();
-        debugPrint("[STATE] Thinking cleared (reason=action.confirmation)");
-        setState(() => _isProcessing = false);
+        _resolveMessage("action.confirmation");
       }
 
-      // P2.5: Clear thinking on error
+      // P3.1: Clear thinking on error
       if (msg['type'] == 'error') {
-        _thinkingTimer?.cancel();
-        debugPrint("[STATE] Thinking cleared (reason=error)");
         final errorMsg = msg['content'] ?? 'An error occurred';
         _addMessage("SYSTEM", "❌ $errorMsg", true);
-        setState(() => _isProcessing = false);
+        _resolveMessage("error");
       }
 
       // Action Confirmation (v1.5)
@@ -346,17 +351,35 @@ class _SentientShellState extends State<SentientShell> {
     _input.clear();
     setState(() => _isProcessing = true);
 
+    // P3.1: Generate and track message_id for lifecycle integrity
+    _pendingMessageId = syncService.sendMessageWithId(text);
+    debugPrint("[P3.1] Pending message_id=$_pendingMessageId");
+
     // P2.5: Start 12s safety timeout
     _thinkingTimer?.cancel();
     _thinkingTimer = Timer(const Duration(seconds: 12), () {
-      if (mounted && _isProcessing) {
-        debugPrint("[STATE] Thinking cleared (reason=12s timeout)");
+      if (mounted && _isProcessing && _pendingMessageId != null) {
+        debugPrint("[P3.1] Timeout for message_id=$_pendingMessageId");
         _addMessage("SYSTEM", "⚠️ Response timeout. Please try again.", true);
-        setState(() => _isProcessing = false);
+        _resolveMessage("12s timeout");
       }
     });
+  }
 
-    syncService.sendMessage(text);
+  // P3.1: Central resolution handler - prevents double resolution
+  void _resolveMessage(String reason) {
+    if (_pendingMessageId == null) {
+      debugPrint("[P3.1] Ignoring resolution ($reason) - no pending message");
+      return;
+    }
+    debugPrint(
+      "[P3.1] Resolving message_id=$_pendingMessageId (reason=$reason)",
+    );
+    _thinkingTimer?.cancel();
+    _pendingMessageId = null;
+    if (mounted) {
+      setState(() => _isProcessing = false);
+    }
   }
 
   @override

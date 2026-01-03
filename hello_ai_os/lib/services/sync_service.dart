@@ -142,8 +142,35 @@ class SyncService {
       connect();
     }
 
-    final msg = {"type": "chat", "content": text, "user_id": "sentient_user"};
+    // P3.1: Generate unique message_id for lifecycle tracking
+    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+    final msg = {
+      "type": "chat",
+      "content": text,
+      "user_id": "sentient_user",
+      "message_id": messageId, // P3.1: Enable request/response matching
+    };
+    debugPrint("[P3.1] Sending message_id=$messageId");
     sendMessageJson(msg);
+  }
+
+  // P3.1: Send with explicit message_id (returns the ID for tracking)
+  String sendMessageWithId(String text) {
+    if (_channel == null) {
+      debugPrint("SyncService: Not connected, trying to connect...");
+      connect();
+    }
+
+    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+    final msg = {
+      "type": "chat",
+      "content": text,
+      "user_id": "sentient_user",
+      "message_id": messageId,
+    };
+    debugPrint("[P3.1] Sending message_id=$messageId");
+    sendMessageJson(msg);
+    return messageId;
   }
 
   void sendMessageJson(Map<String, dynamic> data) {

@@ -389,18 +389,20 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
                         logger.info(f"Received Chat Message: {msg.get('content', '')[:50]}...")
                         content = msg.get("content", "")
                         user_id = msg.get("user_id", "user")
+                        message_id = msg.get("message_id")  # P3.1: Extract for lifecycle tracking
                         
                         # Process with LLM
                         response = await llm_service.generate_response(content, user_id=user_id)
                         
-                        # Send response back
+                        # P3.1: Send response with message_id for request/response matching
                         reply = {
                             "type": "chat.reply",
+                            "message_id": message_id,  # P3.1: Echo for matching
                             "payload": {"text": response},
                             "content": response
                         }
                         await queue.put(reply)
-                        logger.info(f"Chat response queued: {response[:50]}...")
+                        logger.info(f"Chat response queued (message_id={message_id}): {response[:50]}...")
                     
                     if msg_type == "action.confirm":
                         logger.info(f"Received Action Confirmation: {msg}")
