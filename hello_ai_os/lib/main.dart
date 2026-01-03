@@ -367,13 +367,13 @@ class _SentientShellState extends State<SentientShell> {
     _activeTimersCount++;
     _checkResourceLeak();
 
-    // P2.5: Start 12s safety timeout
+    // P2.5: Start 60s safety timeout (matches backend LLM timeout)
     _thinkingTimer?.cancel();
-    _thinkingTimer = Timer(const Duration(seconds: 12), () {
+    _thinkingTimer = Timer(const Duration(seconds: 60), () {
       if (mounted && _isProcessing && _pendingMessageId != null) {
         debugPrint("[P3.1] Timeout for message_id=$_pendingMessageId");
         _addMessage("SYSTEM", "⚠️ Response timeout. Please try again.", true);
-        _resolveMessage("12s timeout");
+        _resolveMessage("60s timeout");
       }
     });
   }
