@@ -18,10 +18,40 @@ class LocalModelEngine:
     def __init__(self):
         self.ollama_url = config.OLLAMA_URL
         self.model_name = config.LOCAL_LLM_MODEL
+        self.fallback_model = getattr(config, 'FALLBACK_LLM_MODEL', 'phi3:mini')
         self.embedding_model = None
+        self._warmed_up = False
         
         # Lazy load embeddings to avoid startup delay
         # self._load_embedding_model_async() # Do NOT load on import, it blocks main thread.
+
+    async def prewarm(self):
+        """
+        Pre-warm the model by generating a single token.
+        This loads the model into GPU/CPU memory for faster subsequent requests.
+        """
+        if self._warmed_up:
+            logger.info("[PREWARM] Model already warmed up")
+            return
+            
+        logger.info(f"[PREWARM] Pre-warming model: {self.model_name}")
+        try:
+            url = f"{self.ollama_url}/api/generate"
+            payload = {
+                "model": self.model_name,
+                "prompt": "hi",
+                "stream": False,
+                "options": {"num_predict": 1}  # Generate only 1 token for speed
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=30.0)
+                if response.status_code == 200:
+                    self._warmed_up = True
+                    logger.info(f"[PREWARM] Model {self.model_name} warmed up successfully")
+                else:
+                    logger.warning(f"[PREWARM] Failed: {response.status_code}")
+        except Exception as e:
+            logger.error(f"[PREWARM] Error: {e}")
 
     def _load_embedding_model_async(self):
         """
@@ -55,15 +85,36 @@ class LocalModelEngine:
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, timeout=60.0)
+                response = await client.post(url, json=payload, timeout=30.0)  # Reduced from 60s
                 response.raise_for_status()
                 data = response.json()
                 return data.get("response", "")
         except httpx.ConnectError:
             logger.error("Ollama Connection Error. Using Fallbacks.")
             return self._fallback_generate(text)
+        except httpx.TimeoutException:
+            logger.warning(f"Primary model timeout, trying fallback: {self.fallback_model}")
+            return await self._generate_with_fallback(text)
         except Exception as e:
             logger.error(f"Local generation error: {e}. Using Fallbacks.")
+            return self._fallback_generate(text)
+
+    async def _generate_with_fallback(self, text: str) -> str:
+        """Try fallback model if primary times out."""
+        url = f"{self.ollama_url}/api/generate"
+        payload = {
+            "model": self.fallback_model,
+            "prompt": text,
+            "stream": False
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=30.0)
+                response.raise_for_status()
+                data = response.json()
+                return data.get("response", "")
+        except Exception as e:
+            logger.error(f"Fallback model also failed: {e}")
             return self._fallback_generate(text)
 
     def _fallback_generate(self, text: str) -> str:

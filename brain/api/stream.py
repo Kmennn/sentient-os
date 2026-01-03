@@ -341,6 +341,12 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     # Send initial state
     await websocket.send_json(get_current_state().model_dump())
     
+    # Pre-warm LLM model for faster first response
+    from brain.core.local_model_engine import local_engine
+    from brain.core.config import config
+    if getattr(config, 'PREWARM_MODEL', True):
+        await local_engine.prewarm()
+    
     # P2.5: Emit brain.ready after all services are ready
     logger.info("[READY] BrainReady emitted")
     await websocket.send_json({

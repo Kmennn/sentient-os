@@ -14,9 +14,13 @@ class Config:
     MODEL_PATH = os.getenv("MODEL_PATH", "./models/main/")
     EMBEDDING_MODEL_PATH = os.getenv("EMBEDDING_MODEL_PATH", "./models/embed/")
     
-    # Ollama Configuration
+    # Ollama Configuration - Optimized for 16GB RAM
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "mistral:latest") # Full model tag
+    LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "qwen2.5:3b")  # Primary: fast, low RAM
+    FALLBACK_LLM_MODEL = os.getenv("FALLBACK_LLM_MODEL", "phi3:mini")  # Fallback: even smaller
+    
+    # Pre-warm settings
+    PREWARM_MODEL = os.getenv("PREWARM_MODEL", "true").lower() == "true"
     
     # Legacy flag mapped to local mode for backward compatibility if needed, 
     # but strictly we are "local_llm" now.
