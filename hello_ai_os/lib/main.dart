@@ -52,13 +52,8 @@ class SentientShell extends StatefulWidget {
 }
 
 class _SentientShellState extends State<SentientShell> {
-  final List<_Msg> _messages = [
-    const _Msg(
-      sender: "AI CORE",
-      text: "Sentient OS v1.3 Online.",
-      isSystem: true,
-    ),
-  ];
+  // P2.9: Start with empty list for calm empty state on first launch
+  final List<_Msg> _messages = [];
   final TextEditingController _input = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -675,104 +670,148 @@ class _SentientShellState extends State<SentientShell> {
 
                 // Chat
                 Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, i) {
-                      final m = _messages[i];
-                      final isYou = m.sender == "YOU";
-                      final screenWidth = MediaQuery.of(context).size.width;
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 6.0,
-                        ), // P2.8: More breathing
-                        child: Align(
-                          alignment: m.isSystem
-                              ? Alignment.center
-                              : (isYou
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft),
-                          child: m.isSystem
-                              ? Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0,
-                                    vertical: 8.0,
-                                  ),
-                                  child: Text(
-                                    m.text,
-                                    textAlign: TextAlign.center,
+                  child: _messages.isEmpty
+                      // P2.9: Empty State - Calm, intentional, not broken
+                      ? AnimatedOpacity(
+                          opacity: 1.0,
+                          duration: const Duration(milliseconds: 120),
+                          curve: Curves.easeOutCubic,
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: 80,
+                              ), // Slightly above center
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "System online. Waiting.",
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(
-                                        0.45,
-                                      ), // P2.8: Slightly more visible
-                                      fontSize: 12,
-                                      height: 1.4,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.w400,
+                                      color: Colors.white.withOpacity(0.60),
+                                      letterSpacing: 0.3,
                                     ),
                                   ),
-                                )
-                              : ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth:
-                                        screenWidth *
-                                        0.70, // P2.8: Max 70% width
-                                  ),
-                                  child: GlassContainer(
-                                    color: isYou
-                                        ? Colors.cyan.withValues(
-                                            alpha: 0.15,
-                                          ) // P2.8: Slightly softer
-                                        : Colors.white.withValues(alpha: 0.06),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal:
-                                          16, // P2.8: More horizontal space
-                                      vertical:
-                                          12, // P2.8: Comfortable vertical
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "Actions require explicit approval.",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.white.withOpacity(0.40),
                                     ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          m.sender,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500,
-                                            letterSpacing: 0.5,
-                                            color: Colors.white.withOpacity(
-                                              isYou ? 0.5 : 0.4,
-                                            ),
-                                          ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, i) {
+                            final m = _messages[i];
+                            final isYou = m.sender == "YOU";
+                            final screenWidth = MediaQuery.of(
+                              context,
+                            ).size.width;
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 6.0,
+                              ), // P2.8: More breathing
+                              child: Align(
+                                alignment: m.isSystem
+                                    ? Alignment.center
+                                    : (isYou
+                                          ? Alignment.centerRight
+                                          : Alignment.centerLeft),
+                                child: m.isSystem
+                                    ? Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16.0,
+                                          vertical: 8.0,
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
+                                        child: Text(
                                           m.text,
+                                          textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            fontSize:
-                                                15, // P2.8: Apple-like size
-                                            height:
-                                                1.4, // P2.8: Comfortable line height
-                                            fontWeight: isYou
-                                                ? FontWeight.w500
-                                                : FontWeight.w400,
                                             color: Colors.white.withOpacity(
-                                              isYou
-                                                  ? 1.0
-                                                  : 0.92, // P2.8: Subtle distinction
-                                            ),
+                                              0.45,
+                                            ), // P2.8: Slightly more visible
+                                            fontSize: 12,
+                                            height: 1.4,
+                                            fontWeight: FontWeight.w400,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
+                                      )
+                                    : ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          maxWidth:
+                                              screenWidth *
+                                              0.70, // P2.8: Max 70% width
+                                        ),
+                                        child: GlassContainer(
+                                          color: isYou
+                                              ? Colors.cyan.withValues(
+                                                  alpha: 0.15,
+                                                ) // P2.8: Slightly softer
+                                              : Colors.white.withValues(
+                                                  alpha: 0.06,
+                                                ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal:
+                                                16, // P2.8: More horizontal space
+                                            vertical:
+                                                12, // P2.8: Comfortable vertical
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                m.sender,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w500,
+                                                  letterSpacing: 0.5,
+                                                  color: Colors.white
+                                                      .withOpacity(
+                                                        isYou ? 0.5 : 0.4,
+                                                      ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                m.text,
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      15, // P2.8: Apple-like size
+                                                  height:
+                                                      1.4, // P2.8: Comfortable line height
+                                                  fontWeight: isYou
+                                                      ? FontWeight.w500
+                                                      : FontWeight.w400,
+                                                  color: Colors.white.withOpacity(
+                                                    isYou
+                                                        ? 1.0
+                                                        : 0.92, // P2.8: Subtle distinction
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
 
                 // P2.7: Apple-Style Skeleton Loading (NO SPINNERS)
