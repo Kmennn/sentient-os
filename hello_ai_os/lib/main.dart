@@ -69,6 +69,13 @@ class _SentientShellState extends State<SentientShell> {
   Timer? _autoModeTimer;
   Timer? _thinkingTimer; // P2.5: 12s safety timeout
 
+  // P3.3: Resource Leak Detection (Frontend)
+  static const int MAX_PENDING_MESSAGES = 3;
+  static const int MAX_ACTIVE_TIMERS = 3;
+  int _pendingMessagesCount = 0;
+  int _activeTimersCount = 0;
+  bool _leakSuspected = false;
+
   // Telemetry
   double _cpu = 0.0;
   double _ram = 0.0;
@@ -355,6 +362,11 @@ class _SentientShellState extends State<SentientShell> {
     _pendingMessageId = syncService.sendMessageWithId(text);
     debugPrint("[P3.1] Pending message_id=$_pendingMessageId");
 
+    // P3.3: Increment pending messages counter
+    _pendingMessagesCount++;
+    _activeTimersCount++;
+    _checkResourceLeak();
+
     // P2.5: Start 12s safety timeout
     _thinkingTimer?.cancel();
     _thinkingTimer = Timer(const Duration(seconds: 12), () {
@@ -377,8 +389,33 @@ class _SentientShellState extends State<SentientShell> {
     );
     _thinkingTimer?.cancel();
     _pendingMessageId = null;
+
+    // P3.3: Decrement counters on resolution
+    if (_pendingMessagesCount > 0) _pendingMessagesCount--;
+    if (_activeTimersCount > 0) _activeTimersCount--;
+    _checkResourceLeak();
+
     if (mounted) {
       setState(() => _isProcessing = false);
+    }
+  }
+
+  // P3.3: Edge-triggered resource leak detection (frontend)
+  void _checkResourceLeak() {
+    final leakDetected =
+        _pendingMessagesCount > MAX_PENDING_MESSAGES ||
+        _activeTimersCount > MAX_ACTIVE_TIMERS;
+
+    if (leakDetected && !_leakSuspected) {
+      // Edge trigger: entering leak state
+      _leakSuspected = true;
+      debugPrint(
+        "[P3.3] RESOURCE_LEAK_SUSPECTED: pending=$_pendingMessagesCount/$MAX_PENDING_MESSAGES, timers=$_activeTimersCount/$MAX_ACTIVE_TIMERS",
+      );
+    } else if (!leakDetected && _leakSuspected) {
+      // Edge trigger: exiting leak state
+      _leakSuspected = false;
+      debugPrint("[P3.3] RESOURCE_LEAK_CLEARED: counters below threshold");
     }
   }
 

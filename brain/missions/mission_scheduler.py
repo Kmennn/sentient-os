@@ -63,6 +63,10 @@ class BrainPhase(Enum):
 MAX_TICK_DURATION_MS = 100
 SLOW_TICK_THRESHOLD_MS = 50
 
+# P3.3: Resource Leak Thresholds
+MAX_PENDING_EVENTS = 100
+MAX_PENDING_ACTIONS = 10
+MAX_QUEUE_SIZE = 50
 
 class MissionPriority(IntEnum):
     BACKGROUND = 1
@@ -216,6 +220,10 @@ class MissionScheduler:
         self._consecutive_slow_ticks: int = 0
         self._consecutive_healthy_ticks: int = 0
         self._stall_active: bool = False
+        
+        # P3.3: Resource Leak Detection State (edge-triggered)
+        self._leak_suspected: bool = False
+        self._pending_actions_count: int = 0
         
         # H4: Voice Output Manager
         self.voice_manager = VoiceOutputManager(self) # access to context via self
@@ -1207,6 +1215,49 @@ class MissionScheduler:
             if self._backpressure_active:
                 self._backpressure_active = False
                 self._log_autonomy_decision(DecisionType.BACKPRESSURE_CLEARED, reason=f"Tick recovered: {elapsed_ms:.2f}ms", was_auto=False)
+
+        # P3.3: Resource Leak Detection (edge-triggered)
+        queue_size = len(self._queue)
+        pending_ledger = len(self._pending_ledger_entries)
+        pending_actions = self._pending_actions_count
+        
+        # Check if any threshold exceeded
+        leak_detected = (
+            queue_size > MAX_QUEUE_SIZE or
+            pending_ledger > MAX_PENDING_EVENTS or
+            pending_actions > MAX_PENDING_ACTIONS
+        )
+        
+        if leak_detected and not self._leak_suspected:
+            # Edge trigger: entering leak state
+            self._leak_suspected = True
+            leak_reason = f"queue={queue_size}/{MAX_QUEUE_SIZE}, ledger={pending_ledger}/{MAX_PENDING_EVENTS}, actions={pending_actions}/{MAX_PENDING_ACTIONS}"
+            self._log_autonomy_decision(
+                DecisionType.RESOURCE_LEAK_SUSPECTED,
+                reason=leak_reason,
+                was_auto=False
+            )
+            self.event_bus.emit(EventType.RESOURCE_LEAK_SUSPECTED, {
+                "queue_size": queue_size,
+                "pending_ledger_entries": pending_ledger,
+                "pending_actions": pending_actions
+            })
+            logger.warning(f"[P3.3] RESOURCE_LEAK_SUSPECTED: {leak_reason}")
+        
+        elif not leak_detected and self._leak_suspected:
+            # Edge trigger: exiting leak state
+            self._leak_suspected = False
+            self._log_autonomy_decision(
+                DecisionType.RESOURCE_LEAK_CLEARED,
+                reason="All resource counters below thresholds",
+                was_auto=False
+            )
+            self.event_bus.emit(EventType.RESOURCE_LEAK_CLEARED, {
+                "queue_size": queue_size,
+                "pending_ledger_entries": pending_ledger,
+                "pending_actions": pending_actions
+            })
+            logger.info(f"[P3.3] RESOURCE_LEAK_CLEARED: system recovered")
 
         # S8: Populate Health Snapshot (Before clearing context)
         self._last_state_snapshot = {

@@ -334,6 +334,9 @@ async def websocket_endpoint(websocket: WebSocket, client_type: str = "UI"):
     # P3.2: Subscribe to stall detection events
     event_bus.subscribe_async(EventType.SCHEDULER_STALL_DETECTED, event_handler)
     event_bus.subscribe_async(EventType.SCHEDULER_STALL_CLEARED, event_handler)
+    # P3.3: Subscribe to resource leak events
+    event_bus.subscribe_async(EventType.RESOURCE_LEAK_SUSPECTED, event_handler)
+    event_bus.subscribe_async(EventType.RESOURCE_LEAK_CLEARED, event_handler)
     
     # Send initial state
     await websocket.send_json(get_current_state().model_dump())

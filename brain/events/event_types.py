@@ -23,3 +23,7 @@ class EventType(StrEnum):
     # P3.2: Scheduler Stall Detection (edge-triggered)
     SCHEDULER_STALL_DETECTED = auto()
     SCHEDULER_STALL_CLEARED = auto()
+    
+    # P3.3: Resource Leak Detection (edge-triggered)
+    RESOURCE_LEAK_SUSPECTED = auto()
+    RESOURCE_LEAK_CLEARED = auto()

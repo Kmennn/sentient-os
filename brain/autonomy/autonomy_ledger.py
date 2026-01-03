@@ -91,6 +91,9 @@ class DecisionType(Enum):
     # P3.2: Scheduler Stall Detection (edge-triggered)
     SCHEDULER_STALL_DETECTED = "scheduler_stall_detected"
     SCHEDULER_STALL_CLEARED = "scheduler_stall_cleared"
+    # P3.3: Resource Leak Detection (edge-triggered)
+    RESOURCE_LEAK_SUSPECTED = "resource_leak_suspected"
+    RESOURCE_LEAK_CLEARED = "resource_leak_cleared"
 
 @dataclass
 class AutonomyDecision:
